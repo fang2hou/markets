@@ -1,0 +1,14 @@
+exchange:
+  okx:
+    apiKey: 123456
+    secret: 123456
+    password: 123456
+  gateio:
+    apiKey: 123456
+    secret: 123456
+currency:
+  - STARL/USDT
+  - BTC/USDT
+log:
+  enable: true
+  path: logs

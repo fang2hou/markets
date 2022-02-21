@@ -1,7 +1,22 @@
 package main
 
-import "fmt"
+import (
+	"Markets/internal/pkg/config"
+	"fmt"
+	"io/ioutil"
+)
 
 func main() {
-	fmt.Printf("Hello, world.\n")
+	dataBytes, err := ioutil.ReadFile("configs/config.yaml.example")
+	if err != nil {
+		return
+	}
+
+	testConfig := config.Config{}
+
+	if err := testConfig.Load(dataBytes); err != nil {
+		return
+	}
+
+	fmt.Printf("%+v\n", testConfig)
 }
