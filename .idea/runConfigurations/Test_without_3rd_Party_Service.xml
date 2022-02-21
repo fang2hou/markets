@@ -1,0 +1,13 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="Test without 3rd Party Service" type="GoTestRunConfiguration" factoryName="Go Test">
+    <module name="Markets" />
+    <working_directory value="$PROJECT_DIR$" />
+    <kind value="DIRECTORY" />
+    <package value="Markets" />
+    <directory value="$PROJECT_DIR$" />
+    <filePath value="$PROJECT_DIR$" />
+    <framework value="gotest" />
+    <pattern value="[a-z]$" />
+    <method v="2" />
+  </configuration>
+</component>
