@@ -1,15 +1,12 @@
 package database
 
 import (
-	"context"
 	"github.com/go-redis/redis/v8"
 	"testing"
 )
 
 func TestConnector_InternalConnector(t *testing.T) {
-	c := InternalConnector{
-		storage: make(map[string]map[string]string),
-	}
+	c := NewInternalConnector()
 
 	testString := "testing1234567890"
 
@@ -29,14 +26,11 @@ func TestConnector_InternalConnector(t *testing.T) {
 }
 
 func TestConnector_RedisConnector_(t *testing.T) {
-	c := RedisConnector{
-		client: redis.NewClient(&redis.Options{
-			Addr:     "localhost:6379",
-			Password: "", // no password set
-			DB:       0,  // use default DB
-		}),
-		context: context.Background(),
-	}
+	c := NewRedisConnector(&redis.Options{
+		Addr:     "localhost:6379",
+		Password: "", // no password set
+		DB:       0,  // use default DB
+	})
 
 	testString := "testing1234567890"
 

@@ -168,3 +168,9 @@ func (i *Interactor) SetOrderBook(exchangeName string, currency string, orderBoo
 		return i.connector.Set("OrderBook", key, &dataString)
 	}
 }
+
+func NewInteractor(connector Connector) *Interactor {
+	return &Interactor{
+		connector: connector,
+	}
+}

@@ -52,6 +52,13 @@ func (c *InternalConnector) Delete(region string, key string) error {
 	return errors.New("key not found")
 }
 
+func NewInternalConnector() *InternalConnector {
+	return &InternalConnector{
+		storage: make(map[string]map[string]string),
+	}
+}
+
+// RedisConnector is a connector that stores the values in redis.
 type RedisConnector struct {
 	client  *redis.Client
 	context context.Context
@@ -71,4 +78,11 @@ func (c *RedisConnector) Get(region string, key string) (*string, error) {
 
 func (c *RedisConnector) Delete(region string, key string) error {
 	return c.client.HDel(c.context, region, key).Err()
+}
+
+func NewRedisConnector(options *redis.Options) *RedisConnector {
+	return &RedisConnector{
+		client:  redis.NewClient(options),
+		context: context.Background(),
+	}
 }

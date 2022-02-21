@@ -12,13 +12,7 @@ func TestInteractor_Base(t *testing.T) {
 		"test_key_1002": "test_value_1002",
 	}
 
-	internalConnector := InternalConnector{
-		storage: make(map[string]map[string]string),
-	}
-
-	interactor := Interactor{
-		connector: &internalConnector,
-	}
+	interactor := NewInteractor(NewInternalConnector())
 
 	key := interactor.GenerateKeyWithPath([]string{"TEST", "GO", "a", "b", "c"})
 	if key != "TEST.GO.a.b.c" {
@@ -57,13 +51,7 @@ func TestInteractor_Balance(t *testing.T) {
 		Total: 120000,
 	}
 
-	internalConnector := InternalConnector{
-		storage: make(map[string]map[string]string),
-	}
-
-	interactor := Interactor{
-		connector: &internalConnector,
-	}
+	interactor := NewInteractor(NewInternalConnector())
 
 	if err := interactor.SetBalance("TestExchange", "TEST_CURRENCY", &testBalance); err != nil {
 		t.Errorf("Interactor SetBalance Error: '%s'", err)
@@ -86,13 +74,7 @@ func TestInteractor_Fee(t *testing.T) {
 		Taker: 0.2,
 	}
 
-	internalConnector := InternalConnector{
-		storage: make(map[string]map[string]string),
-	}
-
-	interactor := Interactor{
-		connector: &internalConnector,
-	}
+	interactor := NewInteractor(NewInternalConnector())
 
 	if err := interactor.SetFee("TestExchange", "TEST_CURRENCY", &testFee); err != nil {
 		t.Errorf("Interactor SetFee Error: '%s'", err)
@@ -124,13 +106,7 @@ func TestInteractor_Order(t *testing.T) {
 		FeeCurrency: "TEST_CURRENCY",
 	}
 
-	internalConnector := InternalConnector{
-		storage: make(map[string]map[string]string),
-	}
-
-	interactor := Interactor{
-		connector: &internalConnector,
-	}
+	interactor := NewInteractor(NewInternalConnector())
 
 	if err := interactor.SetOrder("TestExchange", "TEST_CURRENCY", testOrder.Id, &testOrder); err != nil {
 		t.Errorf("Interactor SetOrder Error: '%s'", err)
@@ -160,13 +136,7 @@ func TestInteractor_OrderBook(t *testing.T) {
 		},
 	}
 
-	internalConnector := InternalConnector{
-		storage: make(map[string]map[string]string),
-	}
-
-	interactor := Interactor{
-		connector: &internalConnector,
-	}
+	interactor := NewInteractor(NewInternalConnector())
 
 	if err := interactor.SetOrderBook("TestExchange", "TEST_CURRENCY", &testOrderBook); err != nil {
 		t.Errorf("Interactor SetOrderBook Error: '%s'", err)
