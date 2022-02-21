@@ -13,7 +13,7 @@ func TestInteractor_Base(t *testing.T) {
 	}
 
 	internalConnector := InternalConnector{
-		storage: make(map[string]string),
+		storage: make(map[string]map[string]string),
 	}
 
 	interactor := Interactor{
@@ -25,27 +25,27 @@ func TestInteractor_Base(t *testing.T) {
 		t.Errorf("Interactor GenerateKeyWithPath Error: Expected key to be 'a.b.c', got '%s'", key)
 	}
 
-	if err := interactor.SetString(key, &testString); err != nil {
+	if err := interactor.SetString("Test", key, &testString); err != nil {
 		t.Errorf("Interactor SetString Error: '%s'", err)
 	}
 
-	if dataStringPointer, err := interactor.GetString(key); err != nil {
+	if dataStringPointer, err := interactor.GetString("Test", key); err != nil {
 		t.Errorf("Interactor GetString Error: '%s'", err)
 	} else if *dataStringPointer != testString {
 		t.Errorf("Interactor GetString Error: Expected '%s', got '%s'", testString, *dataStringPointer)
 	}
 
-	if err := interactor.SetMap(key, &testMap); err != nil {
+	if err := interactor.SetMap("Test", key, &testMap); err != nil {
 		t.Errorf("Interactor SetMap Error: '%s'", err)
 	}
 
-	if dataMapPointer, err := interactor.GetMap(key); err != nil {
+	if dataMapPointer, err := interactor.GetMap("Test", key); err != nil {
 		t.Errorf("Interactor GetMap Error: '%s'", err)
 	} else if !reflect.DeepEqual(*dataMapPointer, testMap) {
 		t.Errorf("Interactor GetMap Error: Expected '%v', got '%v'", testMap, *dataMapPointer)
 	}
 
-	if err := interactor.Delete(key); err != nil {
+	if err := interactor.Delete("Test", key); err != nil {
 		t.Errorf("Interactor Delete Error: '%s'", err)
 	}
 }
@@ -58,7 +58,7 @@ func TestInteractor_Balance(t *testing.T) {
 	}
 
 	internalConnector := InternalConnector{
-		storage: make(map[string]string),
+		storage: make(map[string]map[string]string),
 	}
 
 	interactor := Interactor{
@@ -75,7 +75,7 @@ func TestInteractor_Balance(t *testing.T) {
 		t.Errorf("Interactor GetBalance Error: Expected '%v', got '%v'", testBalance, *dataPointer)
 	}
 
-	if err := interactor.Delete("BALANCE.TestExchange.TEST_CURRENCY"); err != nil {
+	if err := interactor.Delete("Balance", "TestExchange.TEST_CURRENCY"); err != nil {
 		t.Errorf("Interactor Delete Error: '%s'", err)
 	}
 }
@@ -87,7 +87,7 @@ func TestInteractor_Fee(t *testing.T) {
 	}
 
 	internalConnector := InternalConnector{
-		storage: make(map[string]string),
+		storage: make(map[string]map[string]string),
 	}
 
 	interactor := Interactor{
@@ -104,7 +104,7 @@ func TestInteractor_Fee(t *testing.T) {
 		t.Errorf("Interactor GetFee Error: Expected '%v', got '%v'", testFee, *dataPointer)
 	}
 
-	if err := interactor.Delete("FEE.TestExchange.TEST_CURRENCY"); err != nil {
+	if err := interactor.Delete("Fee", "TestExchange.TEST_CURRENCY"); err != nil {
 		t.Errorf("Interactor Delete Error: '%s'", err)
 	}
 }
@@ -125,7 +125,7 @@ func TestInteractor_Order(t *testing.T) {
 	}
 
 	internalConnector := InternalConnector{
-		storage: make(map[string]string),
+		storage: make(map[string]map[string]string),
 	}
 
 	interactor := Interactor{
@@ -142,7 +142,7 @@ func TestInteractor_Order(t *testing.T) {
 		t.Errorf("Interactor GetOrder Error: Expected '%v', got '%v'", testOrder, *dataPointer)
 	}
 
-	if err := interactor.Delete("ORDER.TestExchange.TEST_CURRENCY." + testOrder.Id); err != nil {
+	if err := interactor.Delete("Order", "TestExchange.TEST_CURRENCY."+testOrder.Id); err != nil {
 		t.Errorf("Interactor Delete Error: '%s'", err)
 	}
 }
@@ -161,7 +161,7 @@ func TestInteractor_OrderBook(t *testing.T) {
 	}
 
 	internalConnector := InternalConnector{
-		storage: make(map[string]string),
+		storage: make(map[string]map[string]string),
 	}
 
 	interactor := Interactor{
@@ -178,7 +178,7 @@ func TestInteractor_OrderBook(t *testing.T) {
 		t.Errorf("Interactor GetOrderBook Error: Expected '%v', got '%v'", testOrderBook, *dataPointer)
 	}
 
-	if err := interactor.Delete("ORDER-BOOK.TestExchange.TEST_CURRENCY"); err != nil {
+	if err := interactor.Delete("OrderBook", "TestExchange.TEST_CURRENCY"); err != nil {
 		t.Errorf("Interactor Delete Error: '%s'", err)
 	}
 }
