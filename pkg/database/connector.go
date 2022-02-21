@@ -3,6 +3,7 @@ package database
 import (
 	"context"
 	"errors"
+	"github.com/go-redis/redis/v8"
 )
 
 // Connector is the interface that wraps the database accessing method.
@@ -17,12 +18,12 @@ type InternalConnector struct {
 	storage map[string]map[string]string
 }
 
-func (c *InternalConnector) Set(region string, key string, value *string) error {
+func (c *InternalConnector) Set(region string, key string, valuePointer *string) error {
 	if c.storage[region] == nil {
 		c.storage[region] = make(map[string]string)
 	}
 
-	c.storage[region][key] = *value
+	c.storage[region][key] = *valuePointer
 	return nil
 }
 
@@ -49,4 +50,25 @@ func (c *InternalConnector) Delete(region string, key string) error {
 	}
 
 	return errors.New("key not found")
+}
+
+type RedisConnector struct {
+	client  *redis.Client
+	context context.Context
+}
+
+func (c *RedisConnector) Set(region string, key string, valuePointer *string) error {
+	return c.client.HSet(c.context, region, key, *valuePointer).Err()
+}
+
+func (c *RedisConnector) Get(region string, key string) (*string, error) {
+	if value, err := c.client.HGet(c.context, region, key).Result(); err != nil {
+		return nil, err
+	} else {
+		return &value, nil
+	}
+}
+
+func (c *RedisConnector) Delete(region string, key string) error {
+	return c.client.HDel(c.context, region, key).Err()
 }
