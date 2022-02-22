@@ -21,7 +21,7 @@ func TestClient(t *testing.T) {
 	clt := NewClient(&Options{
 		SkipVerify:     false,
 		PingInterval:   600 * time.Second,
-		MessageHandler: &messageHandler,
+		MessageHandler: messageHandler,
 	})
 
 	err := clt.Connect("wss://ws.okx.com:8443/ws/v5/public")

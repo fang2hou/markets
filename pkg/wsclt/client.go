@@ -10,13 +10,13 @@ import (
 type Options struct {
 	SkipVerify     bool
 	PingInterval   time.Duration
-	MessageHandler *func([]byte)
+	MessageHandler func([]byte)
 }
 
 type Client struct {
 	ws             *websocket.Conn
 	options        *Options
-	messageHandler *func([]byte)
+	messageHandler func([]byte)
 
 	isReading             bool
 	isSending             bool
@@ -37,7 +37,7 @@ func (clt *Client) readMessage() {
 		}
 
 		if clt.messageHandler != nil {
-			(*clt.messageHandler)(message)
+			clt.messageHandler(message)
 		}
 	}
 }
@@ -79,7 +79,7 @@ func (clt *Client) IsSending() bool {
 	return clt.isSending
 }
 
-func (clt *Client) RegisterMessageHandler(handler *func([]byte)) {
+func (clt *Client) RegisterMessageHandler(handler func([]byte)) {
 	clt.messageHandler = handler
 }
 
