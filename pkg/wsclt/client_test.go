@@ -2,7 +2,6 @@ package wsclt
 
 import (
 	"encoding/json"
-	"fmt"
 	"reflect"
 	"testing"
 	"time"
@@ -78,6 +77,7 @@ func TestClient(t *testing.T) {
 		t.Errorf("Unexpected message: %v", decodedMsg)
 	}
 
-	fmt.Println("try disconnect")
-	clt.Close()
+	if err := clt.Close(); err != nil {
+		t.Errorf("Close failed")
+	}
 }

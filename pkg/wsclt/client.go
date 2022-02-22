@@ -4,6 +4,7 @@ import (
 	"crypto/tls"
 	"errors"
 	"github.com/gorilla/websocket"
+	"sync"
 	"time"
 )
 
@@ -21,6 +22,7 @@ type Client struct {
 	isReading             bool
 	isSending             bool
 	messageWaitForSending chan []byte
+	sendMux               sync.Mutex
 }
 
 func (clt *Client) readMessage() {
@@ -62,13 +64,13 @@ func (clt *Client) sendMessage() {
 			if !more {
 				return
 			}
-
+			clt.sendMux.Lock()
 			if err := clt.ws.WriteMessage(websocket.TextMessage, message); err != nil {
 				return
 			}
+			clt.sendMux.Unlock()
 		}
 	}
-
 }
 
 func (clt *Client) IsReading() bool {
@@ -88,6 +90,7 @@ func (clt *Client) SendMessage(message []byte) error {
 		clt.messageWaitForSending <- message
 		return nil
 	}
+
 	return errors.New("client is closed")
 }
 
@@ -119,20 +122,29 @@ func (clt *Client) Connect(url string) error {
 	return nil
 }
 
-func (clt *Client) Close() {
+func (clt *Client) Close() error {
 	if clt.ws == nil {
-		return
+		return nil
 	}
 
+	clt.sendMux.Lock()
 	data := websocket.FormatCloseMessage(websocket.CloseNormalClosure, "")
 	_ = clt.ws.WriteMessage(websocket.CloseMessage, data)
+	clt.sendMux.Unlock()
+
+	timeOut := time.After(time.Second * 1000)
 
 	for {
-		if clt.isReading || clt.isSending {
-			time.Sleep(time.Millisecond * 100)
-		} else {
-			clt.ws = nil
-			return
+		select {
+		case <-timeOut:
+			return errors.New("timeout")
+		default:
+			if clt.isReading || clt.isSending {
+				time.Sleep(time.Millisecond * 100)
+			} else {
+				clt.ws = nil
+				return nil
+			}
 		}
 	}
 }
