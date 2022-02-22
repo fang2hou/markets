@@ -3,21 +3,26 @@ package exchange
 import (
 	"Markets/pkg/database"
 	"Markets/pkg/wsclt"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"net/url"
 	"os"
 	"os/signal"
+	"strconv"
+	"strings"
 	"time"
 )
 
 const (
-	CacheTimeout               = 1000
-	OkxWebsocketProtocol       = "wss"
-	OkxWebsocketApiHost        = "ws.okx.com:8443"
-	OkxWebsocketPublicApiPath  = "ws/v5/public"
-	OkxWebsocketPrivateApiPath = "ws/v5/private"
+	OkxWebsocketProtocol          = "wss"
+	OkxWebsocketApiHost           = "ws.okx.com:8443"
+	OkxWebsocketPublicApiPath     = "/ws/v5/public"
+	OkxWebsocketPrivateApiPath    = "/ws/v5/private"
+	OkxWebsocketPrivateVerifyPath = "/users/self/verify"
 )
 
 type Okx struct {
@@ -29,6 +34,7 @@ type Okx struct {
 
 	publicMessages  chan []byte
 	privateMessages chan []byte
+	loginCode       chan int
 
 	orderCache map[string]map[string]database.Order // Used to cache order data for fetching order IDs
 	authData   struct {
@@ -73,26 +79,155 @@ func (e *Okx) handlePublicMessage(message []byte) {
 	}
 
 	fmt.Printf("Received message: %v+\n", data)
+
+	if event, ok := data["event"]; ok {
+		switch event {
+		case "subscribe":
+			if argInterface, ok := data["arg"]; ok {
+				arg := argInterface.(map[string]interface{})
+				if arg["channel"].(string) == "books50-l2-tbt" {
+					fmt.Println("Subscribed to books50-l2-tbt with", arg["instId"].(string))
+				}
+			}
+		}
+	}
 }
 
-func (e *Okx) subscribePublicMessage(message []byte) {
-	e.publicMessages <- message
+func (e *Okx) handlePrivateMessage(message []byte) {
+	var data map[string]interface{}
+
+	if err := json.Unmarshal(message, &data); err != nil {
+		fmt.Println("private message handler error:", err)
+		return
+	}
+
+	fmt.Printf("Received message: %v+\n", data)
+
+	if event, ok := data["event"]; ok {
+		switch event {
+		case "login":
+			if codeString, ok := data["code"]; ok {
+				if code, err := strconv.Atoi(codeString.(string)); err == nil {
+					select {
+					case e.loginCode <- code:
+					default:
+						fmt.Println("already logged in")
+					}
+				} else {
+					fmt.Println("login code conversion error:", err)
+				}
+			}
+		}
+	}
+}
+
+func (e *Okx) convertToGeneralCurrencyString(okxCurrencyString string) string {
+	return strings.Replace(okxCurrencyString, "/", "-", -1)
+}
+
+func (e *Okx) convertToOkxCurrencyString(okxCurrencyString string) string {
+	return strings.Replace(okxCurrencyString, "-", "/", -1)
+}
+
+func (e *Okx) subscribe() {
+	var args []interface{}
+
+	for _, currency := range e.currencies {
+		okxCurrency := e.convertToGeneralCurrencyString(currency)
+		args = append(args, map[string]interface{}{
+			"channel": "books50-l2-tbt",
+			"instId":  okxCurrency,
+		})
+	}
+
+	if err := e.SendPublicMessageJSON(&map[string]interface{}{
+		"op":   "subscribe",
+		"args": args,
+	}); err != nil {
+		panic(err)
+	}
+
+	args = make([]interface{}, 0)
+
+	args = append(args, map[string]interface{}{
+		"channel": "account",
+	})
+
+	for _, currency := range e.currencies {
+		okxCurrency := e.convertToGeneralCurrencyString(currency)
+		args = append(args, map[string]interface{}{
+			"channel":  "orders",
+			"instType": "SPOT",
+			"instId":   okxCurrency,
+		})
+	}
+
+	if err := e.SendPrivateMessageJSON(&map[string]interface{}{
+		"op":   "subscribe",
+		"args": args,
+	}); err != nil {
+		panic(err)
+	}
+}
+
+func (e *Okx) login() {
+	epochTime := fmt.Sprint(time.Now().UTC().Unix())
+	hash := hmac.New(sha256.New, []byte(e.authData.ApiSecret))
+	hash.Write([]byte(epochTime + "GET" + OkxWebsocketPrivateVerifyPath))
+	sign := base64.StdEncoding.EncodeToString(hash.Sum(nil))
+
+	if err := e.SendPrivateMessageJSON(&map[string]interface{}{
+		"op": "login",
+		"args": []map[string]interface{}{
+			{
+				"apiKey":     e.authData.ApiKey,
+				"passphrase": e.authData.Passphrase,
+				"timestamp":  epochTime,
+				"sign":       sign,
+			},
+		},
+	}); err != nil {
+		panic(err)
+	}
+
+	if code := <-e.loginCode; code != 0 {
+		panic(errors.New("login failed"))
+	} else {
+		close(e.loginCode)
+		fmt.Println("login!")
+	}
+}
+
+func (e *Okx) sendMessageRawBytes(clt *wsclt.Client, dataBytes []byte) error {
+	if err := clt.SendMessage(dataBytes); err != nil {
+		return err
+	} else {
+		return nil
+	}
 }
 
 func (e *Okx) SendPublicMessageRawBytes(dataBytes []byte) error {
-	if err := e.wsClients.Public.SendMessage(dataBytes); err != nil {
-		return err
-	}
-
-	return nil
+	return e.sendMessageRawBytes(e.wsClients.Public, dataBytes)
 }
 
-func (e *Okx) SendPublicMessageJSON(data *map[string]interface{}) error {
+func (e *Okx) SendPrivateMessageRawBytes(dataBytes []byte) error {
+	return e.sendMessageRawBytes(e.wsClients.Private, dataBytes)
+}
+
+func (e *Okx) sendMessageJSON(clt *wsclt.Client, data *map[string]interface{}) error {
 	if dataBytes, err := json.Marshal(data); err != nil {
 		return err
 	} else {
-		return e.SendPublicMessageRawBytes(dataBytes)
+		return e.sendMessageRawBytes(clt, dataBytes)
 	}
+}
+
+func (e *Okx) SendPublicMessageJSON(data *map[string]interface{}) error {
+	return e.sendMessageJSON(e.wsClients.Public, data)
+}
+
+func (e *Okx) SendPrivateMessageJSON(data *map[string]interface{}) error {
+	return e.sendMessageJSON(e.wsClients.Private, data)
 }
 
 func (e *Okx) Start() error {
@@ -129,12 +264,15 @@ func (e *Okx) Start() error {
 	e.wsClients.Private = wsclt.NewClient(&wsclt.Options{
 		SkipVerify:     false,
 		PingInterval:   e.aliveSignalInterval,
-		MessageHandler: e.handlePublicMessage,
+		MessageHandler: e.handlePrivateMessage,
 	})
 
 	if err := e.wsClients.Private.Connect(okxWebsocketPrivateApiURL.String()); err != nil {
 		return err
 	}
+
+	e.login()
+	e.subscribe()
 
 	return nil
 }
@@ -156,17 +294,19 @@ func (e *Okx) Stop() error {
 	return nil
 }
 
-func NewOkx(config map[string]string, interactor *database.Interactor) *Okx {
+func NewOkx(config map[string]string, currencies []string, interactor *database.Interactor) *Okx {
 	okx := &Okx{
 		Exchange: Exchange{
 			name:                "OKX",
 			database:            interactor,
 			running:             false,
 			aliveSignalInterval: 25 * time.Second,
+			currencies:          currencies,
 		},
 
 		publicMessages:  make(chan []byte),
 		privateMessages: make(chan []byte),
+		loginCode:       make(chan int),
 
 		orderCache: make(map[string]map[string]database.Order),
 	}

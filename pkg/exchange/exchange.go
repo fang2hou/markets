@@ -16,6 +16,7 @@ type Exchange struct {
 	name                     string
 	database                 *database.Interactor
 	aliveSignalInterval      time.Duration
+	currencies               []string
 }
 
 func (e *Exchange) GetName() string {
