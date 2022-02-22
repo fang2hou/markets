@@ -27,14 +27,11 @@ type Okx struct {
 		Private *wsclt.Client
 	}
 
-	running         bool
 	publicMessages  chan []byte
 	privateMessages chan []byte
-	stopErrors      chan error
 
-	orderCache                map[string]map[string]database.Order // Used to cache order data for fetching order IDs
-	numInitializedConnections chan int                             // Used to keep track of how many connections have been initialized
-	authData                  struct {
+	orderCache map[string]map[string]database.Order // Used to cache order data for fetching order IDs
+	authData   struct {
 		ApiKey     string
 		ApiSecret  string
 		Passphrase string
@@ -78,6 +75,10 @@ func (e *Okx) handlePublicMessage(message []byte) {
 	fmt.Printf("Received message: %v+\n", data)
 }
 
+func (e *Okx) subscribePublicMessage(message []byte) {
+	e.publicMessages <- message
+}
+
 func (e *Okx) SendPublicMessageRawBytes(dataBytes []byte) error {
 	if err := e.wsClients.Public.SendMessage(dataBytes); err != nil {
 		return err
@@ -111,7 +112,7 @@ func (e *Okx) Start() error {
 
 	e.wsClients.Public = wsclt.NewClient(&wsclt.Options{
 		SkipVerify:     false,
-		PingInterval:   25 * time.Second,
+		PingInterval:   e.aliveSignalInterval,
 		MessageHandler: e.handlePublicMessage,
 	})
 
@@ -127,7 +128,7 @@ func (e *Okx) Start() error {
 
 	e.wsClients.Private = wsclt.NewClient(&wsclt.Options{
 		SkipVerify:     false,
-		PingInterval:   25 * time.Second,
+		PingInterval:   e.aliveSignalInterval,
 		MessageHandler: e.handlePublicMessage,
 	})
 
@@ -158,17 +159,16 @@ func (e *Okx) Stop() error {
 func NewOkx(config map[string]string, interactor *database.Interactor) *Okx {
 	okx := &Okx{
 		Exchange: Exchange{
-			name:     "OKX",
-			database: interactor,
-			running:  false,
+			name:                "OKX",
+			database:            interactor,
+			running:             false,
+			aliveSignalInterval: 25 * time.Second,
 		},
 
-		running:         false,
 		publicMessages:  make(chan []byte),
 		privateMessages: make(chan []byte),
 
-		numInitializedConnections: make(chan int),
-		orderCache:                make(map[string]map[string]database.Order),
+		orderCache: make(map[string]map[string]database.Order),
 	}
 
 	if apiKey, ok := config["apiKey"]; ok {
