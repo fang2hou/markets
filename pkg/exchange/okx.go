@@ -384,7 +384,7 @@ func (e *Okx) Stop() error {
 func NewOkx(config map[string]string, currencies []string, interactor *database.Interactor) *Okx {
 	okx := &Okx{
 		Exchange: Exchange{
-			name:                "OKX",
+			name:                "okx",
 			database:            interactor,
 			running:             false,
 			aliveSignalInterval: 25 * time.Second,
