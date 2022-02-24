@@ -74,7 +74,7 @@ func TestOkx_RestApi_(t *testing.T) {
 
 	okx.restClient = &http.Client{}
 
-	if data, err := okx.restApi(&restApiOption{
+	if data, err := okx.RestApi(&RestApiOption{
 		method: "GET",
 		path:   "/account/trade-fee",
 		params: map[string]string{

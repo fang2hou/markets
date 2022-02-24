@@ -26,3 +26,10 @@ func (e *Exchange) GetName() string {
 func (e *Exchange) IsRunning() bool {
 	return e.running
 }
+
+type RestApiOption struct {
+	method string
+	path   string
+	body   map[string]interface{}
+	params map[string]string
+}
