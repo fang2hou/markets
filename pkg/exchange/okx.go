@@ -40,6 +40,18 @@ type feeResult struct {
 	} `json:"data"`
 }
 
+type orderBookResult struct {
+	Arg struct {
+		Channel     string `json:"channel"`
+		OkxCurrency string `json:"instId"`
+	} `json:"arg"`
+	Action string `json:"action"`
+	Data   []struct {
+		Asks [][]string `json:"asks"`
+		Bids [][]string `json:"bids"`
+	} `json:"data"`
+}
+
 type Okx struct {
 	Exchange
 	wsClients struct {
@@ -58,6 +70,8 @@ type Okx struct {
 		ApiSecret  string
 		Passphrase string
 	}
+
+	orderBookCache database.OrderBook
 }
 
 func (e *Okx) updateFee() {
@@ -107,6 +121,56 @@ func (e *Okx) updateFee() {
 	}
 }
 
+func (e *Okx) updateOrderBook(message []byte) error {
+	var result orderBookResult
+	err := json.Unmarshal(message, &result)
+	if err != nil {
+		return err
+	}
+
+	currency := e.convertToGeneralCurrencyString(result.Arg.OkxCurrency)
+
+	switch result.Action {
+	case "snapshot":
+		e.orderBookCache.Asks = make(map[string]string)
+		e.orderBookCache.Bids = make(map[string]string)
+
+		for _, data := range result.Data {
+			for _, ask := range data.Asks {
+				e.orderBookCache.Asks[ask[0]] = ask[1]
+			}
+
+			for _, bid := range data.Bids {
+				e.orderBookCache.Asks[bid[0]] = bid[1]
+			}
+		}
+	case "update":
+		for _, data := range result.Data {
+			for _, ask := range data.Asks {
+				if ask[1] == "0" {
+					delete(e.orderBookCache.Asks, ask[0])
+				} else {
+					e.orderBookCache.Asks[ask[0]] = ask[1]
+				}
+			}
+
+			for _, bid := range data.Bids {
+				if bid[1] == "0" {
+					delete(e.orderBookCache.Bids, bid[0])
+				} else {
+					e.orderBookCache.Asks[bid[0]] = bid[1]
+				}
+			}
+		}
+	}
+
+	if err := e.database.SetOrderBook(e.name, currency, &e.orderBookCache); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (e *Okx) waitForDisconnecting() {
 	// Handle SIGINT and SIGTERM.
 	interruptSignal := make(chan os.Signal, 1)
@@ -148,8 +212,25 @@ func (e *Okx) handlePublicMessage(message []byte) {
 		case "subscribe":
 			if argInterface, ok := data["arg"]; ok {
 				arg := argInterface.(map[string]interface{})
-				if arg["channel"].(string) == "books50-l2-tbt" {
+				switch arg["channel"].(string) {
+				case "books50-l2-tbt":
 					fmt.Println("Subscribed to books50-l2-tbt with", arg["instId"].(string))
+				default:
+					fmt.Println("Subscribed to", arg)
+				}
+			}
+		case "error":
+			fmt.Println("Received error message:", data)
+		}
+	} else if argInterface, ok := data["arg"]; ok {
+		arg := argInterface.(map[string]interface{})
+		if channel, ok := arg["channel"]; ok {
+			switch channel.(string) {
+			case "books50-l2-tbt":
+				err := e.updateOrderBook(message)
+				if err != nil {
+					fmt.Println(err)
+					return
 				}
 			}
 		}
