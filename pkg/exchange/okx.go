@@ -39,6 +39,14 @@ type restApiOption struct {
 	params map[string]string
 }
 
+type feeResult struct {
+	Code int `json:"string"`
+	Data []struct {
+		Maker string `json:"maker"`
+		Taker string `json:"taker"`
+	} `json:"data"`
+}
+
 type Okx struct {
 	Exchange
 	wsClients struct {
@@ -56,6 +64,122 @@ type Okx struct {
 		ApiKey     string
 		ApiSecret  string
 		Passphrase string
+	}
+}
+
+func (e *Okx) restApi(option *restApiOption) ([]byte, error) {
+	method := strings.ToUpper(option.method)
+	timeStamp := time.Now().UTC().Format(OkxRestApiTimeStampFormat)
+
+	content := ""
+	if option.body != nil {
+		if contentBytes, err := json.Marshal(option.body); err != nil {
+			return nil, err
+		} else {
+			content = string(contentBytes)
+		}
+	}
+
+	queryString := ""
+	if option.params != nil {
+		queryString += "?"
+		for key, value := range option.params {
+			queryString += key + "=" + value + "&"
+		}
+		queryString = queryString[:len(queryString)-1]
+	}
+
+	hash := hmac.New(sha256.New, []byte(e.authData.ApiSecret))
+	hash.Write([]byte(timeStamp + method + OkxRestApiPath + option.path + queryString + content))
+	sign := base64.StdEncoding.EncodeToString(hash.Sum(nil))
+
+	restApiURL := url.URL{
+		Scheme: OkxRestApiProtocol,
+		Host:   OkxRestApiHost,
+		Path:   OkxRestApiPath,
+	}
+
+	restApiURLString := restApiURL.String() + option.path + queryString
+
+	if req, err := http.NewRequest(method, restApiURLString, strings.NewReader(content)); err == nil {
+		req.Header.Add("OK-ACCESS-KEY", e.authData.ApiKey)
+		req.Header.Add("OK-ACCESS-SIGN", sign)
+		req.Header.Add("OK-ACCESS-TIMESTAMP", timeStamp)
+		req.Header.Add("OK-ACCESS-PASSPHRASE", e.authData.Passphrase)
+		req.Header.Add("Content-Type", "application/json")
+
+		if resp, err := e.restClient.Do(req); err == nil {
+			defer func(Body io.ReadCloser) {
+				err := Body.Close()
+				if err != nil {
+					panic(err)
+				}
+			}(resp.Body)
+
+			if resp.StatusCode == http.StatusOK ||
+				resp.StatusCode == http.StatusCreated ||
+				resp.StatusCode == http.StatusAccepted {
+
+				if bodyBytes, err := io.ReadAll(resp.Body); err != nil {
+					return nil, err
+				} else {
+					return bodyBytes, nil
+				}
+			} else {
+				return nil, errors.New(resp.Status)
+			}
+		} else {
+			return nil, err
+		}
+	} else {
+		return nil, err
+	}
+}
+
+func (e *Okx) updateFee() {
+	if e.restClient == nil {
+		panic(errors.New("the rest api client is not ready"))
+	}
+
+	for _, currency := range e.currencies {
+		okxCurrency := e.convertToGeneralCurrencyString(currency)
+		if data, err := e.restApi(&restApiOption{
+			method: "GET",
+			path:   "/account/trade-fee",
+			params: map[string]string{
+				"instType": "SPOT",
+				"instId":   okxCurrency,
+			},
+		}); err != nil {
+			panic(err)
+		} else {
+			var result feeResult
+			if err := json.Unmarshal(data, &result); err != nil {
+				panic(err)
+			} else {
+				if len(result.Data) > 0 {
+					var fee database.Fee
+
+					if value, err := strconv.ParseFloat(result.Data[0].Maker, 64); err != nil {
+						panic(err)
+					} else {
+						fee.Maker = value
+					}
+
+					if value, err := strconv.ParseFloat(result.Data[0].Taker, 64); err != nil {
+						panic(err)
+					} else {
+						fee.Taker = value
+					}
+
+					if err := e.database.SetFee(e.name, okxCurrency, &fee); err != nil {
+						panic(err)
+					}
+				} else {
+					panic(errors.New("the length of fee result is 0"))
+				}
+			}
+		}
 	}
 }
 
@@ -210,76 +334,6 @@ func (e *Okx) login() {
 	} else {
 		close(e.loginCode)
 		fmt.Println("login!")
-	}
-}
-
-func (e *Okx) restApi(option *restApiOption) (map[string]interface{}, error) {
-	method := strings.ToUpper(option.method)
-	timeStamp := time.Now().UTC().Format(OkxRestApiTimeStampFormat)
-
-	content := ""
-	if option.body != nil {
-		if contentBytes, err := json.Marshal(option.body); err != nil {
-			return nil, err
-		} else {
-			content = string(contentBytes)
-		}
-	}
-
-	queryString := ""
-	if option.params != nil {
-		queryString += "?"
-		for key, value := range option.params {
-			queryString += key + "=" + value + "&"
-		}
-		queryString = queryString[:len(queryString)-1]
-	}
-
-	hash := hmac.New(sha256.New, []byte(e.authData.ApiSecret))
-	hash.Write([]byte(timeStamp + method + OkxRestApiPath + option.path + queryString + content))
-	sign := base64.StdEncoding.EncodeToString(hash.Sum(nil))
-
-	restApiURL := url.URL{
-		Scheme: OkxRestApiProtocol,
-		Host:   OkxRestApiHost,
-		Path:   OkxRestApiPath,
-	}
-
-	restApiURLString := restApiURL.String() + option.path + queryString
-
-	if req, err := http.NewRequest(method, restApiURLString, strings.NewReader(content)); err == nil {
-		req.Header.Add("OK-ACCESS-KEY", e.authData.ApiKey)
-		req.Header.Add("OK-ACCESS-SIGN", sign)
-		req.Header.Add("OK-ACCESS-TIMESTAMP", timeStamp)
-		req.Header.Add("OK-ACCESS-PASSPHRASE", e.authData.Passphrase)
-		req.Header.Add("Content-Type", "application/json")
-
-		if resp, err := e.restClient.Do(req); err == nil {
-			defer func(Body io.ReadCloser) {
-				err := Body.Close()
-				if err != nil {
-					panic(err)
-				}
-			}(resp.Body)
-
-			if resp.StatusCode == http.StatusOK ||
-				resp.StatusCode == http.StatusCreated ||
-				resp.StatusCode == http.StatusAccepted {
-
-				var data map[string]interface{}
-				if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
-					return nil, err
-				} else {
-					return data, nil
-				}
-			} else {
-				return nil, errors.New(resp.Status)
-			}
-		} else {
-			return nil, err
-		}
-	} else {
-		return nil, err
 	}
 }
 

@@ -3,6 +3,7 @@ package exchange
 import (
 	"Markets/pkg/database"
 	"fmt"
+	"github.com/go-redis/redis/v8"
 	"net/http"
 	"os"
 	"testing"
@@ -56,7 +57,7 @@ func TestOkx(t *testing.T) {
 	}
 }
 
-func TestOkx_RestApi(t *testing.T) {
+func TestOkx_RestApi_(t *testing.T) {
 	okx := NewOkx(
 		map[string]string{
 			"apiKey":   os.Getenv("TEST_OKX_API_KEY"),
@@ -64,7 +65,11 @@ func TestOkx_RestApi(t *testing.T) {
 			"password": os.Getenv("TEST_OKX_PASSPHASE"),
 		},
 		[]string{"STARL/USDT"},
-		database.NewInteractor(database.NewInternalConnector()),
+		database.NewInteractor(database.NewRedisConnector(&redis.Options{
+			Addr:     "localhost:6379",
+			Password: "", // no password set
+			DB:       0,  // use default DB
+		})),
 	)
 
 	okx.restClient = &http.Client{}
@@ -79,6 +84,8 @@ func TestOkx_RestApi(t *testing.T) {
 	}); err != nil {
 		t.Error(err)
 	} else {
-		fmt.Println(data)
+		fmt.Println(string(data))
 	}
+
+	okx.updateFee()
 }
