@@ -2,6 +2,7 @@ package database
 
 import (
 	"encoding/json"
+	"math"
 	"strings"
 )
 
@@ -105,6 +106,10 @@ func (i *Interactor) GetFee(exchangeName string, currency string) (*Fee, error) 
 
 func (i *Interactor) SetFee(exchangeName string, currency string, fee *Fee) error {
 	key := i.GenerateKeyWithPath([]string{exchangeName, currency})
+
+	fee.Taker = math.Abs(fee.Taker)
+	fee.Maker = math.Abs(fee.Maker)
+
 	if dataBytes, err := json.Marshal(fee); err != nil {
 		return err
 	} else {
