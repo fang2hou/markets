@@ -54,18 +54,18 @@ type orderBookResult struct {
 
 type Okx struct {
 	Exchange
-	wsClients struct {
+
+	restClient *http.Client
+	wsClients  struct {
 		Public  *wsclt.Client
 		Private *wsclt.Client
 	}
-	restClient *http.Client
 
 	publicMessages  chan []byte
 	privateMessages chan []byte
 	loginCode       chan int
 
-	orderCache map[string]map[string]database.Order // Used to cache order data for fetching order IDs
-	authData   struct {
+	authData struct {
 		ApiKey     string
 		ApiSecret  string
 		Passphrase string
@@ -522,8 +522,6 @@ func NewOkx(config map[string]string, currencies []string, interactor *database.
 		publicMessages:  make(chan []byte),
 		privateMessages: make(chan []byte),
 		loginCode:       make(chan int),
-
-		orderCache: make(map[string]map[string]database.Order),
 	}
 
 	if apiKey, ok := config["apiKey"]; ok {
