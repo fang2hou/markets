@@ -9,6 +9,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"net/http"
 	"net/url"
 	"os"
 	"os/signal"
@@ -18,12 +20,24 @@ import (
 )
 
 const (
-	OkxWebsocketProtocol          = "wss"
-	OkxWebsocketApiHost           = "ws.okx.com:8443"
-	OkxWebsocketPublicApiPath     = "/ws/v5/public"
-	OkxWebsocketPrivateApiPath    = "/ws/v5/private"
-	OkxWebsocketPrivateVerifyPath = "/users/self/verify"
+	OkxWebsocketApiProtocol          = "wss"
+	OkxWebsocketApiHost              = "ws.okx.com:8443"
+	OkxWebsocketPublicApiPath        = "/ws/v5/public"
+	OkxWebsocketPrivateApiPath       = "/ws/v5/private"
+	OkxWebsocketPrivateApiVerifyPath = "/users/self/verify"
+
+	OkxRestApiProtocol        = "https"
+	OkxRestApiHost            = "www.okx.com"
+	OkxRestApiPath            = "/api/v5"
+	OkxRestApiTimeStampFormat = "2006-01-02T15:04:05.999Z"
 )
+
+type restApiOption struct {
+	method string
+	path   string
+	body   map[string]interface{}
+	params map[string]string
+}
 
 type Okx struct {
 	Exchange
@@ -31,6 +45,7 @@ type Okx struct {
 		Public  *wsclt.Client
 		Private *wsclt.Client
 	}
+	restClient *http.Client
 
 	publicMessages  chan []byte
 	privateMessages chan []byte
@@ -173,7 +188,7 @@ func (e *Okx) subscribe() {
 func (e *Okx) login() {
 	epochTime := fmt.Sprint(time.Now().UTC().Unix())
 	hash := hmac.New(sha256.New, []byte(e.authData.ApiSecret))
-	hash.Write([]byte(epochTime + "GET" + OkxWebsocketPrivateVerifyPath))
+	hash.Write([]byte(epochTime + "GET" + OkxWebsocketPrivateApiVerifyPath))
 	sign := base64.StdEncoding.EncodeToString(hash.Sum(nil))
 
 	if err := e.SendPrivateMessageJSON(&map[string]interface{}{
@@ -195,6 +210,76 @@ func (e *Okx) login() {
 	} else {
 		close(e.loginCode)
 		fmt.Println("login!")
+	}
+}
+
+func (e *Okx) restApi(option *restApiOption) (map[string]interface{}, error) {
+	method := strings.ToUpper(option.method)
+	timeStamp := time.Now().UTC().Format(OkxRestApiTimeStampFormat)
+
+	content := ""
+	if option.body != nil {
+		if contentBytes, err := json.Marshal(option.body); err != nil {
+			return nil, err
+		} else {
+			content = string(contentBytes)
+		}
+	}
+
+	queryString := ""
+	if option.params != nil {
+		queryString += "?"
+		for key, value := range option.params {
+			queryString += key + "=" + value + "&"
+		}
+		queryString = queryString[:len(queryString)-1]
+	}
+
+	hash := hmac.New(sha256.New, []byte(e.authData.ApiSecret))
+	hash.Write([]byte(timeStamp + method + OkxRestApiPath + option.path + queryString + content))
+	sign := base64.StdEncoding.EncodeToString(hash.Sum(nil))
+
+	restApiURL := url.URL{
+		Scheme: OkxRestApiProtocol,
+		Host:   OkxRestApiHost,
+		Path:   OkxRestApiPath,
+	}
+
+	restApiURLString := restApiURL.String() + option.path + queryString
+
+	if req, err := http.NewRequest(method, restApiURLString, strings.NewReader(content)); err == nil {
+		req.Header.Add("OK-ACCESS-KEY", e.authData.ApiKey)
+		req.Header.Add("OK-ACCESS-SIGN", sign)
+		req.Header.Add("OK-ACCESS-TIMESTAMP", timeStamp)
+		req.Header.Add("OK-ACCESS-PASSPHRASE", e.authData.Passphrase)
+		req.Header.Add("Content-Type", "application/json")
+
+		if resp, err := e.restClient.Do(req); err == nil {
+			defer func(Body io.ReadCloser) {
+				err := Body.Close()
+				if err != nil {
+					panic(err)
+				}
+			}(resp.Body)
+
+			if resp.StatusCode == http.StatusOK ||
+				resp.StatusCode == http.StatusCreated ||
+				resp.StatusCode == http.StatusAccepted {
+
+				var data map[string]interface{}
+				if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
+					return nil, err
+				} else {
+					return data, nil
+				}
+			} else {
+				return nil, errors.New(resp.Status)
+			}
+		} else {
+			return nil, err
+		}
+	} else {
+		return nil, err
 	}
 }
 
@@ -240,7 +325,7 @@ func (e *Okx) Start() error {
 	go e.waitForDisconnecting()
 
 	okxWebsocketPublicApiURL := url.URL{
-		Scheme: OkxWebsocketProtocol,
+		Scheme: OkxWebsocketApiProtocol,
 		Host:   OkxWebsocketApiHost,
 		Path:   OkxWebsocketPublicApiPath,
 	}
@@ -256,7 +341,7 @@ func (e *Okx) Start() error {
 	}
 
 	okxWebsocketPrivateApiURL := url.URL{
-		Scheme: OkxWebsocketProtocol,
+		Scheme: OkxWebsocketApiProtocol,
 		Host:   OkxWebsocketApiHost,
 		Path:   OkxWebsocketPrivateApiPath,
 	}
@@ -273,6 +358,8 @@ func (e *Okx) Start() error {
 
 	e.login()
 	e.subscribe()
+
+	e.restClient = &http.Client{}
 
 	return nil
 }

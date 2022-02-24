@@ -3,6 +3,7 @@ package exchange
 import (
 	"Markets/pkg/database"
 	"fmt"
+	"net/http"
 	"os"
 	"testing"
 	"time"
@@ -52,5 +53,32 @@ func TestOkx(t *testing.T) {
 
 	if err := okx.Stop(); err != nil {
 		fmt.Println("Can't stop okx", err)
+	}
+}
+
+func TestOkx_RestApi(t *testing.T) {
+	okx := NewOkx(
+		map[string]string{
+			"apiKey":   os.Getenv("TEST_OKX_API_KEY"),
+			"secret":   os.Getenv("TEST_OKX_SECRET"),
+			"password": os.Getenv("TEST_OKX_PASSPHASE"),
+		},
+		[]string{"STARL/USDT"},
+		database.NewInteractor(database.NewInternalConnector()),
+	)
+
+	okx.restClient = &http.Client{}
+
+	if data, err := okx.restApi(&restApiOption{
+		method: "GET",
+		path:   "/account/trade-fee",
+		params: map[string]string{
+			"instType": "SPOT",
+			"instId":   "STARL-USDT",
+		},
+	}); err != nil {
+		t.Error(err)
+	} else {
+		fmt.Println(data)
 	}
 }
