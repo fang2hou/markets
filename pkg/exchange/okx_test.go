@@ -12,7 +12,7 @@ import (
 
 func TestOkx(t *testing.T) {
 	// Okx Simulate API
-	okx := NewOkx(
+	e := NewOkx(
 		map[string]string{
 			"apiKey":   os.Getenv("TEST_OKX_API_KEY"),
 			"secret":   os.Getenv("TEST_OKX_SECRET"),
@@ -22,44 +22,44 @@ func TestOkx(t *testing.T) {
 		database.NewInteractor(database.NewInternalConnector()),
 	)
 
-	if okx.authData.ApiKey != os.Getenv("TEST_OKX_API_KEY") {
+	if e.authData.ApiKey != os.Getenv("TEST_OKX_API_KEY") {
 		t.Error(
 			"API Key is not set correctly.",
 			"Expected:", os.Getenv("TEST_OKX_API_KEY"),
-			"got: ", okx.authData.ApiKey,
+			"got: ", e.authData.ApiKey,
 		)
 	}
 
-	if okx.authData.ApiSecret != os.Getenv("TEST_OKX_SECRET") {
+	if e.authData.ApiSecret != os.Getenv("TEST_OKX_SECRET") {
 		t.Error(
 			"API secret is not set correctly.",
 			"Expected:", os.Getenv("TEST_OKX_SECRET"),
-			"got: ", okx.authData.ApiSecret,
+			"got: ", e.authData.ApiSecret,
 		)
 	}
 
-	if okx.authData.Passphrase != os.Getenv("TEST_OKX_PASSPHASE") {
+	if e.authData.Passphrase != os.Getenv("TEST_OKX_PASSPHASE") {
 		t.Error(
 			"API passphrase is not set correctly.",
 			"Expected:", os.Getenv("TEST_OKX_PASSPHASE"),
-			"got: ", okx.authData.Passphrase,
+			"got: ", e.authData.Passphrase,
 		)
 	}
 
-	if err := okx.Start(); err != nil {
-		fmt.Println("Can't start okx:", err)
+	if err := e.Start(); err != nil {
+		t.Error("Can't start okx:", err)
 	}
 
 	<-time.After(time.Second * 10)
 
-	if err := okx.Stop(); err != nil {
+	if err := e.Stop(); err != nil {
 		fmt.Println("Can't stop okx", err)
 	}
 }
 
 func TestOkx_Redis_(t *testing.T) {
 	// Okx Simulate API
-	okx := NewOkx(
+	e := NewOkx(
 		map[string]string{
 			"apiKey":   os.Getenv("TEST_OKX_API_KEY"),
 			"secret":   os.Getenv("TEST_OKX_SECRET"),
@@ -73,43 +73,43 @@ func TestOkx_Redis_(t *testing.T) {
 		})),
 	)
 
-	if okx.authData.ApiKey != os.Getenv("TEST_OKX_API_KEY") {
+	if e.authData.ApiKey != os.Getenv("TEST_OKX_API_KEY") {
 		t.Error(
 			"API Key is not set correctly.",
 			"Expected:", os.Getenv("TEST_OKX_API_KEY"),
-			"got: ", okx.authData.ApiKey,
+			"got: ", e.authData.ApiKey,
 		)
 	}
 
-	if okx.authData.ApiSecret != os.Getenv("TEST_OKX_SECRET") {
+	if e.authData.ApiSecret != os.Getenv("TEST_OKX_SECRET") {
 		t.Error(
 			"API secret is not set correctly.",
 			"Expected:", os.Getenv("TEST_OKX_SECRET"),
-			"got: ", okx.authData.ApiSecret,
+			"got: ", e.authData.ApiSecret,
 		)
 	}
 
-	if okx.authData.Passphrase != os.Getenv("TEST_OKX_PASSPHASE") {
+	if e.authData.Passphrase != os.Getenv("TEST_OKX_PASSPHASE") {
 		t.Error(
 			"API passphrase is not set correctly.",
 			"Expected:", os.Getenv("TEST_OKX_PASSPHASE"),
-			"got: ", okx.authData.Passphrase,
+			"got: ", e.authData.Passphrase,
 		)
 	}
 
-	if err := okx.Start(); err != nil {
+	if err := e.Start(); err != nil {
 		fmt.Println("Can't start okx:", err)
 	}
 
-	<-time.After(time.Second * 10)
+	<-time.After(time.Second * 5)
 
-	if err := okx.Stop(); err != nil {
+	if err := e.Stop(); err != nil {
 		fmt.Println("Can't stop okx", err)
 	}
 }
 
 func TestOkx_RestApi_(t *testing.T) {
-	okx := NewOkx(
+	e := NewOkx(
 		map[string]string{
 			"apiKey":   os.Getenv("TEST_OKX_API_KEY"),
 			"secret":   os.Getenv("TEST_OKX_SECRET"),
@@ -123,9 +123,9 @@ func TestOkx_RestApi_(t *testing.T) {
 		})),
 	)
 
-	okx.restClient = &http.Client{}
+	e.restClient = &http.Client{}
 
-	if data, err := okx.RestApi(&RestApiOption{
+	if data, err := e.RestApi(&RestApiOption{
 		method: "GET",
 		path:   "/account/trade-fee",
 		params: map[string]string{
@@ -138,5 +138,5 @@ func TestOkx_RestApi_(t *testing.T) {
 		fmt.Println(string(data))
 	}
 
-	okx.updateFee()
+	e.updateFee()
 }
