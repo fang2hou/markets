@@ -426,14 +426,14 @@ func (e *Okx) subscribe() {
 	var args []interface{}
 
 	for _, currency := range e.currencies {
-		okxCurrency := e.convertToGeneralCurrencyString(currency)
+		okxCurrency := e.convertToOkxCurrencyString(currency)
 		args = append(args, map[string]interface{}{
 			"channel": "books50-l2-tbt",
 			"instId":  okxCurrency,
 		})
 	}
 
-	if err := e.SendPublicMessageJSON(&map[string]interface{}{
+	if err := e.SendPublicMessageJSON(map[string]interface{}{
 		"op":   "subscribe",
 		"args": args,
 	}); err != nil {
@@ -455,7 +455,7 @@ func (e *Okx) subscribe() {
 		})
 	}
 
-	if err := e.SendPrivateMessageJSON(&map[string]interface{}{
+	if err := e.SendPrivateMessageJSON(map[string]interface{}{
 		"op":   "subscribe",
 		"args": args,
 	}); err != nil {
@@ -469,7 +469,7 @@ func (e *Okx) login() {
 	hash.Write([]byte(epochTime + "GET" + OkxWebsocketPrivateApiVerifyPath))
 	sign := base64.StdEncoding.EncodeToString(hash.Sum(nil))
 
-	if err := e.SendPrivateMessageJSON(&map[string]interface{}{
+	if err := e.SendPrivateMessageJSON(map[string]interface{}{
 		"op": "login",
 		"args": []map[string]interface{}{
 			{
@@ -499,7 +499,7 @@ func (e *Okx) sendMessageRawBytes(clt *wsclt.Client, dataBytes []byte) error {
 	}
 }
 
-func (e *Okx) sendMessageJSON(clt *wsclt.Client, data *map[string]interface{}) error {
+func (e *Okx) sendMessageJSON(clt *wsclt.Client, data map[string]interface{}) error {
 	if dataBytes, err := json.Marshal(data); err != nil {
 		return err
 	} else {
@@ -515,11 +515,11 @@ func (e *Okx) SendPrivateMessageRawBytes(dataBytes []byte) error {
 	return e.sendMessageRawBytes(e.wsClients.Private, dataBytes)
 }
 
-func (e *Okx) SendPublicMessageJSON(data *map[string]interface{}) error {
+func (e *Okx) SendPublicMessageJSON(data map[string]interface{}) error {
 	return e.sendMessageJSON(e.wsClients.Public, data)
 }
 
-func (e *Okx) SendPrivateMessageJSON(data *map[string]interface{}) error {
+func (e *Okx) SendPrivateMessageJSON(data map[string]interface{}) error {
 	return e.sendMessageJSON(e.wsClients.Private, data)
 }
 
