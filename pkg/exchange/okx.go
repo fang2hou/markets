@@ -317,6 +317,10 @@ func (e *Okx) waitForDisconnecting() {
 }
 
 func (e *Okx) handlePublicMessage(message []byte) {
+	if !jsonCheck.MatchString(string(message)) {
+		return
+	}
+
 	var data map[string]interface{}
 	if err := json.Unmarshal(message, &data); err != nil {
 		return
@@ -353,6 +357,10 @@ func (e *Okx) handlePublicMessage(message []byte) {
 }
 
 func (e *Okx) handlePrivateMessage(message []byte) {
+	if !jsonCheck.MatchString(string(message)) {
+		return
+	}
+
 	var data map[string]interface{}
 	if err := json.Unmarshal(message, &data); err != nil {
 		return
@@ -392,14 +400,12 @@ func (e *Okx) handlePrivateMessage(message []byte) {
 		if channel, ok := arg["channel"]; ok {
 			switch channel.(string) {
 			case "account":
-				err := e.updateBalance(message)
-				if err != nil {
+				if err := e.updateBalance(message); err != nil {
 					fmt.Println(err)
 					return
 				}
 			case "orders":
-				err := e.updateOrder(message)
-				if err != nil {
+				if err := e.updateOrder(message); err != nil {
 					fmt.Println(err)
 					return
 				}

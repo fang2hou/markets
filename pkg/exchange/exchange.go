@@ -2,6 +2,7 @@ package exchange
 
 import (
 	"Markets/pkg/database"
+	"regexp"
 	"time"
 )
 
@@ -33,3 +34,5 @@ type RestApiOption struct {
 	body   map[string]interface{}
 	params map[string]string
 }
+
+var jsonCheck = regexp.MustCompile(`(?i:(?:application|text)/(?:vnd\.[^;]+\+)?json)`)
