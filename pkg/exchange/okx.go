@@ -52,6 +52,42 @@ type orderBookResult struct {
 	} `json:"data"`
 }
 
+type orderResult struct {
+	Arg struct {
+		Channel     string `json:"channel"`
+		OkxCurrency string `json:"instId"`
+	} `json:"arg"`
+	Data []struct {
+		Id          string `json:"ordId"`
+		CreateTime  string `json:"cTime"`
+		UpdateTime  string `json:"uTime"`
+		Price       string `json:"px"`
+		Amount      string `json:"sz"`
+		Side        string `json:"side"`
+		Type        string `json:"ordType"`
+		Filled      string `json:"accFillSz"`
+		FilledPrice string `json:"avgPx"`
+		Fee         string `json:"fee"`
+		FeeCurrency string `json:"feeCcy"`
+		State       string `json:"state"`
+	} `json:"data"`
+}
+
+type balanceResult struct {
+	Arg struct {
+		Channel     string `json:"channel"`
+		OkxCurrency string `json:"instId"`
+	} `json:"arg"`
+	Data []struct {
+		Details []struct {
+			Currency string `json:"ccy"`
+			Free     string `json:"availBal"`
+			Used     string `json:"frozenBal"`
+			Total    string `json:"eq"`
+		} `json:"details"`
+	} `json:"data"`
+}
+
 type Okx struct {
 	Exchange
 
@@ -141,7 +177,7 @@ func (e *Okx) updateOrderBook(message []byte) error {
 			}
 
 			for _, bid := range data.Bids {
-				e.orderBookCache.Asks[bid[0]] = bid[1]
+				e.orderBookCache.Bids[bid[0]] = bid[1]
 			}
 		}
 	case "update":
@@ -158,7 +194,7 @@ func (e *Okx) updateOrderBook(message []byte) error {
 				if bid[1] == "0" {
 					delete(e.orderBookCache.Bids, bid[0])
 				} else {
-					e.orderBookCache.Asks[bid[0]] = bid[1]
+					e.orderBookCache.Bids[bid[0]] = bid[1]
 				}
 			}
 		}
@@ -166,6 +202,89 @@ func (e *Okx) updateOrderBook(message []byte) error {
 
 	if err := e.database.SetOrderBook(e.name, currency, &e.orderBookCache); err != nil {
 		return err
+	}
+
+	return nil
+}
+
+func (e *Okx) updateBalance(message []byte) error {
+	var result balanceResult
+	if err := json.Unmarshal(message, &result); err != nil {
+		return err
+	}
+
+	for _, data := range result.Data {
+		for _, detail := range data.Details {
+			balance := &database.Balance{}
+			balance.Free, _ = strconv.ParseFloat(detail.Free, 64)
+			balance.Used, _ = strconv.ParseFloat(detail.Used, 64)
+			balance.Total, _ = strconv.ParseFloat(detail.Total, 64)
+
+			if err := e.database.SetBalance(e.name, detail.Currency, balance); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
+func (e *Okx) updateOrder(message []byte) error {
+	var result orderResult
+	if err := json.Unmarshal(message, &result); err != nil {
+		return err
+	}
+
+	currency := e.convertToGeneralCurrencyString(result.Arg.OkxCurrency)
+
+	for _, o := range result.Data {
+		order := &database.Order{
+			Id:           o.Id,
+			Type:         o.Type,
+			Side:         o.Side,
+			CreateTime:   o.CreateTime,
+			UpdateTime:   o.UpdateTime,
+			Price:        0,
+			FilledPrice:  0,
+			Amount:       0,
+			FilledAmount: 0,
+			LeftAmount:   0,
+			Status:       "",
+			Fee:          0,
+			FeeCurrency:  "",
+		}
+
+		if o.Type == "limit" {
+			order.Price, _ = strconv.ParseFloat(o.Price, 64)
+		}
+
+		order.Amount, _ = strconv.ParseFloat(o.Amount, 64)
+		order.FilledAmount, _ = strconv.ParseFloat(o.Filled, 64)
+		order.LeftAmount = order.Amount - order.FilledAmount
+
+		switch o.State {
+		case "live":
+			order.Status = "created"
+		case "filled":
+			order.Status = "finished"
+			order.FilledPrice, _ = strconv.ParseFloat(o.FilledPrice, 64)
+			order.FeeCurrency = o.FeeCurrency
+			order.Fee, _ = strconv.ParseFloat(o.Fee, 64)
+
+		case "canceled":
+			if o.Filled == "0" {
+				order.Status = "canceled"
+			} else {
+				order.Status = "partial canceled"
+				order.FilledPrice, _ = strconv.ParseFloat(o.FilledPrice, 64)
+				order.FeeCurrency = o.FeeCurrency
+				order.Fee, _ = strconv.ParseFloat(o.Fee, 64)
+			}
+		}
+
+		if err := e.database.SetOrder(e.name, currency, o.Id, order); err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -199,13 +318,9 @@ func (e *Okx) waitForDisconnecting() {
 
 func (e *Okx) handlePublicMessage(message []byte) {
 	var data map[string]interface{}
-
 	if err := json.Unmarshal(message, &data); err != nil {
-		fmt.Println("public message handler error:", err)
 		return
 	}
-
-	fmt.Printf("Received message: %v+\n", data)
 
 	if event, ok := data["event"]; ok {
 		switch event {
@@ -239,13 +354,9 @@ func (e *Okx) handlePublicMessage(message []byte) {
 
 func (e *Okx) handlePrivateMessage(message []byte) {
 	var data map[string]interface{}
-
 	if err := json.Unmarshal(message, &data); err != nil {
-		fmt.Println("private message handler error:", err)
 		return
 	}
-
-	fmt.Printf("Received message: %v+\n", data)
 
 	if event, ok := data["event"]; ok {
 		switch event {
@@ -259,6 +370,38 @@ func (e *Okx) handlePrivateMessage(message []byte) {
 					}
 				} else {
 					fmt.Println("login code conversion error:", err)
+				}
+			}
+		case "subscribe":
+			if argInterface, ok := data["arg"]; ok {
+				arg := argInterface.(map[string]interface{})
+				switch arg["channel"].(string) {
+				case "account":
+					fmt.Println("Subscribed to", arg)
+				case "orders":
+					fmt.Println("Subscribed to", arg)
+				default:
+					fmt.Println("Subscribed to", arg)
+				}
+			}
+		case "error":
+			fmt.Println("Received error message:", data)
+		}
+	} else if argInterface, ok := data["arg"]; ok {
+		arg := argInterface.(map[string]interface{})
+		if channel, ok := arg["channel"]; ok {
+			switch channel.(string) {
+			case "account":
+				err := e.updateBalance(message)
+				if err != nil {
+					fmt.Println(err)
+					return
+				}
+			case "orders":
+				err := e.updateOrder(message)
+				if err != nil {
+					fmt.Println(err)
+					return
 				}
 			}
 		}
@@ -488,6 +631,7 @@ func (e *Okx) Start() error {
 	e.subscribe()
 
 	e.restClient = &http.Client{}
+	e.updateFee()
 
 	return nil
 }
