@@ -32,7 +32,7 @@ const (
 	OkxRestApiTimeStampFormat = "2006-01-02T15:04:05.999Z"
 )
 
-type feeResult struct {
+type okxFeeResult struct {
 	Code int `json:"string"`
 	Data []struct {
 		Maker string `json:"maker"`
@@ -40,7 +40,7 @@ type feeResult struct {
 	} `json:"data"`
 }
 
-type orderBookResult struct {
+type okxOrderBookResult struct {
 	Arg struct {
 		Channel     string `json:"channel"`
 		OkxCurrency string `json:"instId"`
@@ -52,7 +52,7 @@ type orderBookResult struct {
 	} `json:"data"`
 }
 
-type orderResult struct {
+type okxOrderResult struct {
 	Arg struct {
 		Channel     string `json:"channel"`
 		OkxCurrency string `json:"instId"`
@@ -73,7 +73,7 @@ type orderResult struct {
 	} `json:"data"`
 }
 
-type balanceResult struct {
+type okxBalanceResult struct {
 	Arg struct {
 		Channel     string `json:"channel"`
 		OkxCurrency string `json:"instId"`
@@ -127,7 +127,7 @@ func (e *Okx) updateFee() {
 		}); err != nil {
 			panic(err)
 		} else {
-			var result feeResult
+			var result okxFeeResult
 			if err := json.Unmarshal(data, &result); err != nil {
 				panic(err)
 			} else {
@@ -158,7 +158,7 @@ func (e *Okx) updateFee() {
 }
 
 func (e *Okx) updateOrderBook(message []byte) error {
-	var result orderBookResult
+	var result okxOrderBookResult
 	err := json.Unmarshal(message, &result)
 	if err != nil {
 		return err
@@ -208,7 +208,7 @@ func (e *Okx) updateOrderBook(message []byte) error {
 }
 
 func (e *Okx) updateBalance(message []byte) error {
-	var result balanceResult
+	var result okxBalanceResult
 	if err := json.Unmarshal(message, &result); err != nil {
 		return err
 	}
@@ -230,7 +230,7 @@ func (e *Okx) updateBalance(message []byte) error {
 }
 
 func (e *Okx) updateOrder(message []byte) error {
-	var result orderResult
+	var result okxOrderResult
 	if err := json.Unmarshal(message, &result); err != nil {
 		return err
 	}
