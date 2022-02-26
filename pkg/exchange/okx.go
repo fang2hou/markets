@@ -415,11 +415,11 @@ func (e *Okx) handlePrivateMessage(message []byte) {
 }
 
 func (e *Okx) convertToGeneralCurrencyString(okxCurrencyString string) string {
-	return strings.Replace(okxCurrencyString, "/", "-", -1)
+	return strings.Replace(okxCurrencyString, "-", "/", -1)
 }
 
-func (e *Okx) convertToOkxCurrencyString(okxCurrencyString string) string {
-	return strings.Replace(okxCurrencyString, "-", "/", -1)
+func (e *Okx) convertToOkxCurrencyString(generalCurrencyString string) string {
+	return strings.Replace(generalCurrencyString, "/", "-", -1)
 }
 
 func (e *Okx) subscribe() {
