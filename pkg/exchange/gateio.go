@@ -34,10 +34,39 @@ type gateioFeeResult struct {
 	MakerFeeRate string `json:"maker_fee"`
 }
 
-type gateioBalanceResult struct {
+type gateioBalanceRestApiResult struct {
 	Currency  string `json:"currency"`
 	Available string `json:"available"`
 	Locked    string `json:"locked"`
+}
+
+type gateioBalanceWebSocketApiResult struct {
+	Result []struct {
+		Currency  string `json:"currency"`
+		Available string `json:"available"`
+		Total     string `json:"total"`
+	} `json:"result"`
+}
+
+type gateioOrderBookRestApiResult struct {
+	Id   int64     `json:"id"`
+	Asks [][]string `json:"asks"`
+	Bids [][]string `json:"bids"`
+}
+
+type gateioOrderBookWebSocketApiResult struct {
+	Result struct {
+		GateioCurrency string     `json:"s"`
+		FirstUpdate    int64     `json:"U"`
+		LastUpdate     int64     `json:"u"`
+		Asks           [][]string `json:"a"`
+		Bids           [][]string `json:"b"`
+	} `json:"result"`
+}
+
+type gateioCacheOrderBook struct {
+	Id   int64
+	Data *database.OrderBook
 }
 
 type Gateio struct {
@@ -52,6 +81,8 @@ type Gateio struct {
 		ApiKey    string
 		ApiSecret string
 	}
+
+	orderBookCache map[string]*gateioCacheOrderBook
 }
 
 func (e *Gateio) updateFee() {
@@ -85,7 +116,70 @@ func (e *Gateio) updateFee() {
 	}
 }
 
-func (e *Gateio) updateBalance() error {
+func (e *Gateio) initializeOrderBook(currency string) {
+	gateioCurrency := e.convertToGateioCurrencyString(currency)
+	if data, err := e.RestApi(&RestApiOption{
+		method: "GET",
+		path:   "/spot/order_book",
+		params: map[string]string{
+			"currency_pair": gateioCurrency,
+			"limit":         "100",
+			"with_id":       "true",
+		},
+	}); err != nil {
+		panic(err)
+	} else {
+		e.orderBookCache[currency] = &gateioCacheOrderBook{
+			Id:   0,
+			Data: &database.OrderBook{},
+		}
+
+		var result gateioOrderBookRestApiResult
+		if err := json.Unmarshal(data, &result); err != nil {
+			panic(err)
+		} else {
+			e.orderBookCache[currency].Id = result.Id
+
+			updateOrderBook(true, e.orderBookCache[currency].Data, result.Asks, result.Bids)
+
+			if err := e.database.SetOrderBook(e.name, currency, e.orderBookCache[currency].Data); err != nil {
+				panic(err)
+			}
+		}
+	}
+}
+
+func (e *Gateio) updateOrderBook(message []byte) error {
+	var result gateioOrderBookWebSocketApiResult
+	err := json.Unmarshal(message, &result)
+	if err != nil {
+		fmt.Println(err)
+		return err
+	}
+
+	currency := e.convertToGeneralCurrencyString(result.Result.GateioCurrency)
+
+	if orderBook, ok := e.orderBookCache[currency]; ok {
+		if orderBook.Id+1 >= result.Result.FirstUpdate && orderBook.Id+1 <= result.Result.LastUpdate {
+			updateOrderBook(false, orderBook.Data, result.Result.Asks, result.Result.Bids)
+			orderBook.Id = result.Result.LastUpdate
+			fmt.Println("update order book: " + currency + fmt.Sprintf(" %d", result.Result.LastUpdate))
+			if err := e.database.SetOrderBook(e.name, currency, orderBook.Data); err != nil {
+				return err
+			}
+		} else if orderBook.Id+1 > result.Result.LastUpdate {
+			return nil
+		} else if orderBook.Id+1 < result.Result.FirstUpdate {
+			e.initializeOrderBook(currency)
+		}
+	} else {
+		return errors.New("gateio: order book not found" + currency)
+	}
+
+	return nil
+}
+
+func (e *Gateio) initializeBalance() error {
 	if e.restClient == nil {
 		panic(errors.New("the rest api client is not ready"))
 	}
@@ -96,7 +190,7 @@ func (e *Gateio) updateBalance() error {
 	}); err != nil {
 		panic(err)
 	} else {
-		var result []gateioBalanceResult
+		var result []gateioBalanceRestApiResult
 		if err := json.Unmarshal(data, &result); err != nil {
 			return err
 		} else {
@@ -117,19 +211,81 @@ func (e *Gateio) updateBalance() error {
 	return nil
 }
 
-func (e *Gateio) handleMessage(message []byte) {
-	if !jsonCheck.MatchString(string(message)) {
-		return
+func (e *Gateio) updateBalance(message []byte) error {
+	var result gateioBalanceWebSocketApiResult
+	if err := json.Unmarshal(message, &result); err != nil {
+		return err
 	}
 
+	for _, data := range result.Result {
+		balance := &database.Balance{}
+		balance.Total, _ = strconv.ParseFloat(data.Total, 64)
+		balance.Free, _ = strconv.ParseFloat(data.Available, 64)
+		balance.Used = balance.Total - balance.Free
+
+		if err := e.database.SetBalance(e.name, data.Currency, balance); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
-func (e *Gateio) convertToGeneralCurrencyString(okxCurrencyString string) string {
-	return strings.Replace(okxCurrencyString, "/", "_", -1)
+func (e *Gateio) handleMessage(message []byte) {
+	var data map[string]interface{}
+	if err := json.Unmarshal(message, &data); err != nil {
+		return
+	}
+	fmt.Println(string(message))
+
+	if channel, ok := data["channel"]; ok {
+		switch channel {
+		case "spot.order_book_update":
+			if event, ok := data["event"]; ok {
+				switch event {
+				case "subscribe":
+					fmt.Println("Subscribe to order book")
+				case "update":
+					err := e.updateOrderBook(message)
+					if err != nil {
+						return
+					}
+				}
+			}
+		case "spot.orders":
+			if event, ok := data["event"]; ok {
+				switch event {
+				case "subscribe":
+					fmt.Println("Subscribe to order")
+				case "update":
+					//err := e.updateBalance(message)
+					//if err != nil {
+					//	panic(err)
+					//}
+				}
+			}
+		case "spot.balances":
+			if event, ok := data["event"]; ok {
+				switch event {
+				case "subscribe":
+					fmt.Println("Subscribe to balance")
+				case "update":
+					err := e.updateBalance(message)
+					if err != nil {
+						panic(err)
+					}
+				}
+			}
+		}
+	}
 }
 
-func (e *Gateio) convertToGateioCurrencyString(okxCurrencyString string) string {
-	return strings.Replace(okxCurrencyString, "_", "/", -1)
+func (e *Gateio) convertToGeneralCurrencyString(gateioCurrencyString string) string {
+	return strings.Replace(gateioCurrencyString, "_", "/", -1)
+}
+
+func (e *Gateio) convertToGateioCurrencyString(generalCurrencyString string) string {
+	return strings.Replace(generalCurrencyString, "/", "_", -1)
 }
 
 func (e *Gateio) SendMessageRawBytes(dataBytes []byte) error {
@@ -141,9 +297,33 @@ func (e *Gateio) SendMessageRawBytes(dataBytes []byte) error {
 }
 
 func (e *Gateio) SendMessageJSON(data map[string]interface{}) error {
+	var channel, event string
+
+	if value, ok := data["channel"]; ok {
+		channel = value.(string)
+	}
+
+	if value, ok := data["event"]; ok {
+		event = value.(string)
+	}
+
+	timeStamp := time.Now().Unix()
+	data["time"] = timeStamp
+
+	hash := hmac.New(sha512.New, []byte(e.authData.ApiSecret))
+	hash.Write([]byte(fmt.Sprintf("channel=%s&event=%s&time=%d", channel, event, timeStamp)))
+	sign := hex.EncodeToString(hash.Sum(nil))
+
+	data["auth"] = map[string]interface{}{
+		"method": "api_key",
+		"KEY":    e.authData.ApiKey,
+		"SIGN":   sign,
+	}
+
 	if dataBytes, err := json.Marshal(data); err != nil {
 		return err
 	} else {
+		fmt.Println(string(dataBytes))
 		return e.SendMessageRawBytes(dataBytes)
 	}
 }
@@ -153,10 +333,9 @@ func (e *Gateio) subscribe() {
 	for _, currency := range e.currencies {
 		gateioCurrency := e.convertToGateioCurrencyString(currency)
 		params := map[string]interface{}{
-			"time":    time.Now().Unix(),
-			"channel": "spot.order_book",
+			"channel": "spot.order_book_update",
 			"event":   "subscribe",
-			"instId":  []string{gateioCurrency, "10", "100ms"},
+			"payload": []string{gateioCurrency, "100ms"},
 		}
 
 		if err := e.SendMessageJSON(params); err != nil {
@@ -173,7 +352,6 @@ func (e *Gateio) subscribe() {
 		}
 
 		params := map[string]interface{}{
-			"time":    time.Now().Unix(),
 			"channel": "spot.orders",
 			"event":   "subscribe",
 			"payload": currencies,
@@ -320,7 +498,7 @@ func (e *Gateio) Start() error {
 	}
 
 	e.wsClient = wsclt.NewClient(&wsclt.Options{
-		SkipVerify:     true,
+		SkipVerify:     false,
 		PingInterval:   e.aliveSignalInterval,
 		MessageHandler: e.handleMessage,
 	})
@@ -333,7 +511,7 @@ func (e *Gateio) Start() error {
 
 	e.restClient = &http.Client{}
 	e.updateFee()
-	err := e.updateBalance()
+	err := e.initializeBalance()
 	if err != nil {
 		return err
 	}
@@ -377,6 +555,15 @@ func NewGateio(config map[string]string, currencies []string, interactor *databa
 		gateio.authData.ApiSecret = apiSecret
 	} else {
 		panic("No API secret provided for Gateio")
+	}
+
+	gateio.orderBookCache = make(map[string]*gateioCacheOrderBook)
+
+	for _, currency := range currencies {
+		gateio.orderBookCache[currency] = &gateioCacheOrderBook{
+			Id:   0,
+			Data: &database.OrderBook{},
+		}
 	}
 
 	return gateio

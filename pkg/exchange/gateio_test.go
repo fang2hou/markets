@@ -5,9 +5,10 @@ import (
 	"github.com/go-redis/redis/v8"
 	"os"
 	"testing"
+	"time"
 )
 
-func TestGateio_RestApi_(t *testing.T) {
+func TestGateio_Redis_(t *testing.T) {
 	e := NewGateio(
 		map[string]string{
 			"apiKey": os.Getenv("TEST_GATEIO_API_KEY"),
@@ -41,7 +42,29 @@ func TestGateio_RestApi_(t *testing.T) {
 		t.Error("Can't start gateio:", err)
 	}
 
-	if err := e.updateBalance(); err != nil {
-		t.Error("Can't update balance:", err)
-	}
+	//if dataBytes, err := e.RestApi(&RestApiOption{
+	//	method: "GET",
+	//	path:   "/wallet/fee",
+	//}); err != nil {
+	//	t.Error("Can't get fee:", err)
+	//} else {
+	//	var data map[string]interface{}
+	//	if err := json.Unmarshal(dataBytes, &data); err != nil {
+	//		t.Error("Can't unmarshal fee:", err)
+	//	} else {
+	//		if _, ok := data["taker_fee"]; !ok {
+	//			t.Error("Can't get taker fee:", data)
+	//		}
+	//	}
+	//}
+
+	//if err := e.SendMessageJSON(map[string]interface{}{
+	//	"channel": "spot.order_book_update",
+	//	"event":   "subscribe",
+	//	"payload": []string{"STARL_USDT", "100ms"},
+	//}); err != nil {
+	//	t.Error("Can't subscribe order book update:", err)
+	//}
+
+	<-time.After(time.Second * 100)
 }
