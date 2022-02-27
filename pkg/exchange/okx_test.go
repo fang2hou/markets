@@ -2,16 +2,15 @@ package exchange
 
 import (
 	"Markets/pkg/database"
+	"encoding/json"
 	"fmt"
 	"github.com/go-redis/redis/v8"
 	"net/http"
 	"os"
 	"testing"
-	"time"
 )
 
 func TestOkx(t *testing.T) {
-	// Okx Simulate API
 	e := NewOkx(
 		map[string]string{
 			"apiKey":   os.Getenv("TEST_OKX_API_KEY"),
@@ -23,34 +22,23 @@ func TestOkx(t *testing.T) {
 	)
 
 	if e.authData.ApiKey != os.Getenv("TEST_OKX_API_KEY") {
-		t.Error(
-			"API Key is not set correctly.",
-			"Expected:", os.Getenv("TEST_OKX_API_KEY"),
-			"got: ", e.authData.ApiKey,
-		)
+		t.Errorf("API Key is not set correctly.\nExpected:\n\t%s\nActual:\n\t%s",
+			os.Getenv("TEST_OKX_API_KEY"), e.authData.ApiKey)
 	}
 
 	if e.authData.ApiSecret != os.Getenv("TEST_OKX_SECRET") {
-		t.Error(
-			"API secret is not set correctly.",
-			"Expected:", os.Getenv("TEST_OKX_SECRET"),
-			"got: ", e.authData.ApiSecret,
-		)
+		t.Errorf("API Secret is not set correctly.\nExpected:\n\t%s\nActual:\n\t%s",
+			os.Getenv("TEST_OKX_SECRET"), e.authData.ApiSecret)
 	}
 
 	if e.authData.Passphrase != os.Getenv("TEST_OKX_PASSPHASE") {
-		t.Error(
-			"API passphrase is not set correctly.",
-			"Expected:", os.Getenv("TEST_OKX_PASSPHASE"),
-			"got: ", e.authData.Passphrase,
-		)
+		t.Errorf("API Passphrase is not set correctly.\nExpected:\n\t%s\nActual:\n\t%s",
+			os.Getenv("TEST_OKX_PASSPHASE"), e.authData.Passphrase)
 	}
 
 	if err := e.Start(); err != nil {
 		t.Error("Can't start okx:", err)
 	}
-
-	<-time.After(time.Second * 10)
 
 	if err := e.Stop(); err != nil {
 		fmt.Println("Can't stop okx", err)
@@ -58,7 +46,6 @@ func TestOkx(t *testing.T) {
 }
 
 func TestOkx_Redis_(t *testing.T) {
-	// Okx Simulate API
 	e := NewOkx(
 		map[string]string{
 			"apiKey":   os.Getenv("TEST_OKX_API_KEY"),
@@ -68,40 +55,14 @@ func TestOkx_Redis_(t *testing.T) {
 		[]string{"STARL/USDT"},
 		database.NewInteractor(database.NewRedisConnector(&redis.Options{
 			Addr:     "localhost:6379",
-			Password: "", // no password set
-			DB:       0,  // use default DB
+			Password: "",
+			DB:       0,
 		})),
 	)
-
-	if e.authData.ApiKey != os.Getenv("TEST_OKX_API_KEY") {
-		t.Error(
-			"API Key is not set correctly.",
-			"Expected:", os.Getenv("TEST_OKX_API_KEY"),
-			"got: ", e.authData.ApiKey,
-		)
-	}
-
-	if e.authData.ApiSecret != os.Getenv("TEST_OKX_SECRET") {
-		t.Error(
-			"API secret is not set correctly.",
-			"Expected:", os.Getenv("TEST_OKX_SECRET"),
-			"got: ", e.authData.ApiSecret,
-		)
-	}
-
-	if e.authData.Passphrase != os.Getenv("TEST_OKX_PASSPHASE") {
-		t.Error(
-			"API passphrase is not set correctly.",
-			"Expected:", os.Getenv("TEST_OKX_PASSPHASE"),
-			"got: ", e.authData.Passphrase,
-		)
-	}
 
 	if err := e.Start(); err != nil {
 		fmt.Println("Can't start okx:", err)
 	}
-
-	<-time.After(time.Second * 15)
 
 	if err := e.Stop(); err != nil {
 		fmt.Println("Can't stop okx", err)
@@ -115,12 +76,8 @@ func TestOkx_RestApi_(t *testing.T) {
 			"secret":   os.Getenv("TEST_OKX_SECRET"),
 			"password": os.Getenv("TEST_OKX_PASSPHASE"),
 		},
-		[]string{"STARL/USDT"},
-		database.NewInteractor(database.NewRedisConnector(&redis.Options{
-			Addr:     "localhost:6379",
-			Password: "", // no password set
-			DB:       0,  // use default DB
-		})),
+		[]string{"BTC/USDT"},
+		database.NewInteractor(database.NewInternalConnector()),
 	)
 
 	e.restClient = &http.Client{}
@@ -135,8 +92,18 @@ func TestOkx_RestApi_(t *testing.T) {
 	}); err != nil {
 		t.Error(err)
 	} else {
-		fmt.Println(string(data))
+		var dataMap map[string]interface{}
+
+		if err := json.Unmarshal(data, &dataMap); err != nil {
+			t.Error(err)
+		} else {
+			if dataMap["code"] != "0" {
+				t.Errorf("Time not get correctly: %v", dataMap)
+			}
+		}
 	}
 
-	e.updateFee()
+	if err := e.updateFee(); err != nil {
+		t.Error(err)
+	}
 }

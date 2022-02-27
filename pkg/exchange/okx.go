@@ -110,9 +110,9 @@ type Okx struct {
 	orderBookCache map[string]*database.OrderBook
 }
 
-func (e *Okx) updateFee() {
+func (e *Okx) updateFee() error {
 	if e.restClient == nil {
-		panic(errors.New("the rest api client is not ready"))
+		return errors.New("the rest api client is not ready")
 	}
 
 	for _, currency := range e.currencies {
@@ -125,36 +125,38 @@ func (e *Okx) updateFee() {
 				"instId":   okxCurrency,
 			},
 		}); err != nil {
-			panic(err)
+			return err
 		} else {
 			var result okxFeeResult
 			if err := json.Unmarshal(data, &result); err != nil {
-				panic(err)
+				return err
 			} else {
 				if len(result.Data) > 0 {
 					var fee database.Fee
 
 					if value, err := strconv.ParseFloat(result.Data[0].Maker, 64); err != nil {
-						panic(err)
+						return err
 					} else {
 						fee.Maker = value
 					}
 
 					if value, err := strconv.ParseFloat(result.Data[0].Taker, 64); err != nil {
-						panic(err)
+						return err
 					} else {
 						fee.Taker = value
 					}
 
 					if err := e.database.SetFee(e.name, okxCurrency, &fee); err != nil {
-						panic(err)
+						return err
 					}
 				} else {
-					panic(errors.New("the length of fee result is 0"))
+					return errors.New("the length of fee result is 0")
 				}
 			}
 		}
 	}
+
+	return nil
 }
 
 func (e *Okx) updateOrderBook(message []byte) error {
@@ -599,7 +601,10 @@ func (e *Okx) Start() error {
 	e.subscribe()
 
 	e.restClient = &http.Client{}
-	e.updateFee()
+
+	if err := e.updateFee(); err != nil {
+		return err
+	}
 
 	return nil
 }
