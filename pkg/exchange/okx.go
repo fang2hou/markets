@@ -165,39 +165,9 @@ func (e *Okx) updateOrderBook(message []byte) error {
 	}
 
 	currency := e.convertToGeneralCurrencyString(result.Arg.OkxCurrency)
-
-	switch result.Action {
-	case "snapshot":
-		e.orderBookCache[currency].Asks = make(map[string]string)
-		e.orderBookCache[currency].Bids = make(map[string]string)
-
-		for _, data := range result.Data {
-			for _, ask := range data.Asks {
-				e.orderBookCache[currency].Asks[ask[0]] = ask[1]
-			}
-
-			for _, bid := range data.Bids {
-				e.orderBookCache[currency].Bids[bid[0]] = bid[1]
-			}
-		}
-	case "update":
-		for _, data := range result.Data {
-			for _, ask := range data.Asks {
-				if ask[1] == "0" {
-					delete(e.orderBookCache[currency].Asks, ask[0])
-				} else {
-					e.orderBookCache[currency].Asks[ask[0]] = ask[1]
-				}
-			}
-
-			for _, bid := range data.Bids {
-				if bid[1] == "0" {
-					delete(e.orderBookCache[currency].Bids, bid[0])
-				} else {
-					e.orderBookCache[currency].Bids[bid[0]] = bid[1]
-				}
-			}
-		}
+	fullMode := result.Action == "snapshot"
+	for _, data := range result.Data {
+		updateOrderBook(fullMode, e.orderBookCache[currency], data.Asks, data.Bids)
 	}
 
 	if err := e.database.SetOrderBook(e.name, currency, e.orderBookCache[currency]); err != nil {
