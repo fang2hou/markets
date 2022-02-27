@@ -2,21 +2,76 @@ package main
 
 import (
 	"Markets/internal/pkg/config"
-	"fmt"
+	"Markets/pkg/database"
+	"Markets/pkg/exchange"
+	"github.com/go-redis/redis/v8"
 	"io/ioutil"
 )
 
+func pollExchange(e exchange.Exchanger) {
+	forever := make(chan bool)
+
+	if err := e.Start(); err != nil {
+		panic(err)
+	}
+
+	defer func() {
+		if err := e.Stop(); err != nil {
+			panic(err)
+		}
+	}()
+
+	<-forever
+}
+
 func main() {
-	dataBytes, err := ioutil.ReadFile("configs/config.yaml.example")
+	dataBytes, err := ioutil.ReadFile("configs/config.yaml")
 	if err != nil {
-		return
+		panic(err)
 	}
 
-	testConfig := config.Config{}
+	cfg := config.Config{}
 
-	if err := testConfig.Load(dataBytes); err != nil {
-		return
+	if err := cfg.Load(dataBytes); err != nil {
+		panic(err)
 	}
 
-	fmt.Printf("%+v\n", testConfig)
+	var currencies []string
+
+	if value, err := cfg.GetCurrenciesSetting(); err != nil {
+		panic(err)
+	} else {
+		currencies = value
+	}
+
+	if setting, err := cfg.GetExchangeSetting("okx"); err != nil {
+		panic(err)
+	} else {
+		e := exchange.NewOkx(
+			setting,
+			currencies,
+			database.NewInteractor(database.NewRedisConnector(&redis.Options{
+				Addr: "localhost:6379",
+			})),
+		)
+
+		go pollExchange(e)
+	}
+
+	if setting, err := cfg.GetExchangeSetting("gateio"); err != nil {
+		panic(err)
+	} else {
+		e := exchange.NewGateio(
+			setting,
+			currencies,
+			database.NewInteractor(database.NewRedisConnector(&redis.Options{
+				Addr: "localhost:6379",
+			})),
+		)
+
+		go pollExchange(e)
+	}
+
+	forever := make(chan bool)
+	<-forever
 }
