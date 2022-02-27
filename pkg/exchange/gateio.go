@@ -64,6 +64,24 @@ type gateioOrderBookWebSocketApiResult struct {
 	} `json:"result"`
 }
 
+type gateioOrderResult struct {
+	Data []struct {
+		Id               string `json:"id"`
+		CreateTime       string `json:"create_time"`
+		UpdateTime       string `json:"update_time"`
+		Price            string `json:"price"`
+		Amount           string `json:"amount"`
+		Side             string `json:"side"`
+		Type             string `json:"type"`
+		Left             string `json:"left"`
+		FilledTotalPrice string `json:"filled_total"`
+		Fee              string `json:"fee"`
+		FeeCurrency      string `json:"fee_currency"`
+		Event            string `json:"event"`
+		GateioCurrency   string `json:"currency_pair"`
+	} `json:"result"`
+}
+
 type gateioCacheOrderBook struct {
 	Id   int64
 	Data *database.OrderBook
@@ -170,7 +188,6 @@ func (e *Gateio) updateOrderBook(message []byte) error {
 		if orderBook.Id+1 >= result.Result.FirstUpdate && orderBook.Id+1 <= result.Result.LastUpdate {
 			updateOrderBook(false, orderBook.Data, result.Result.Asks, result.Result.Bids)
 			orderBook.Id = result.Result.LastUpdate
-			fmt.Println("update order book: " + currency + fmt.Sprintf(" %d", result.Result.LastUpdate))
 			if err := e.database.SetOrderBook(e.name, currency, orderBook.Data); err != nil {
 				return err
 			}
@@ -241,12 +258,70 @@ func (e *Gateio) updateBalance(message []byte) error {
 	return nil
 }
 
+func (e *Gateio) updateOrder(message []byte) error {
+	var result gateioOrderResult
+	if err := json.Unmarshal(message, &result); err != nil {
+		return err
+	}
+
+	for _, o := range result.Data {
+		currency := e.convertToGeneralCurrencyString(o.GateioCurrency)
+		order := &database.Order{
+			Id:           o.Id,
+			Type:         o.Type,
+			Side:         o.Side,
+			CreateTime:   o.CreateTime,
+			UpdateTime:   o.UpdateTime,
+			Price:        0,
+			FilledPrice:  0,
+			Amount:       0,
+			FilledAmount: 0,
+			LeftAmount:   0,
+			Status:       "",
+			Fee:          0,
+			FeeCurrency:  "",
+		}
+
+		order.Price, _ = strconv.ParseFloat(o.Price, 64)
+		order.Amount, _ = strconv.ParseFloat(o.Amount, 64)
+		order.LeftAmount, _ = strconv.ParseFloat(o.Left, 64)
+		order.FilledAmount = order.Amount - order.LeftAmount
+
+		switch o.Event {
+		case "put":
+			order.Status = "normal"
+		case "update":
+			order.Status = "normal"
+		case "finish":
+			order.FeeCurrency = o.FeeCurrency
+			order.Fee, _ = strconv.ParseFloat(o.Fee, 64)
+
+			if o.Left == "0" {
+				order.Status = "finished"
+				filledTotalPrice, _ := strconv.ParseFloat(o.FilledTotalPrice, 64)
+				order.FilledPrice = filledTotalPrice / order.FilledAmount
+			} else if o.Left == o.Amount {
+				order.Status = "canceled"
+			} else {
+				order.Status = "partial canceled"
+				filledTotalPrice, _ := strconv.ParseFloat(o.FilledTotalPrice, 64)
+				order.FilledPrice = filledTotalPrice / order.FilledAmount
+			}
+		}
+
+		if err := e.database.SetOrder(e.name, currency, o.Id, order); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 func (e *Gateio) handleMessage(message []byte) {
 	var data map[string]interface{}
 	if err := json.Unmarshal(message, &data); err != nil {
 		return
 	}
-	fmt.Println(string(message))
 
 	if channel, ok := data["channel"]; ok {
 		switch channel {
@@ -256,9 +331,8 @@ func (e *Gateio) handleMessage(message []byte) {
 				case "subscribe":
 					fmt.Println("Subscribe to order book")
 				case "update":
-					err := e.updateOrderBook(message)
-					if err != nil {
-						return
+					if err := e.updateOrderBook(message); err != nil {
+						panic(err)
 					}
 				}
 			}
@@ -268,10 +342,9 @@ func (e *Gateio) handleMessage(message []byte) {
 				case "subscribe":
 					fmt.Println("Subscribe to order")
 				case "update":
-					//err := e.updateBalance(message)
-					//if err != nil {
-					//	panic(err)
-					//}
+					if err := e.updateOrder(message); err != nil {
+						panic(err)
+					}
 				}
 			}
 		case "spot.balances":
@@ -280,8 +353,7 @@ func (e *Gateio) handleMessage(message []byte) {
 				case "subscribe":
 					fmt.Println("Subscribe to balance")
 				case "update":
-					err := e.updateBalance(message)
-					if err != nil {
+					if err := e.updateBalance(message); err != nil {
 						panic(err)
 					}
 				}
