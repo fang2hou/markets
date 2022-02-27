@@ -49,7 +49,7 @@ type gateioBalanceWebSocketApiResult struct {
 }
 
 type gateioOrderBookRestApiResult struct {
-	Id   int64     `json:"id"`
+	Id   int64      `json:"id"`
 	Asks [][]string `json:"asks"`
 	Bids [][]string `json:"bids"`
 }
@@ -57,8 +57,8 @@ type gateioOrderBookRestApiResult struct {
 type gateioOrderBookWebSocketApiResult struct {
 	Result struct {
 		GateioCurrency string     `json:"s"`
-		FirstUpdate    int64     `json:"U"`
-		LastUpdate     int64     `json:"u"`
+		FirstUpdate    int64      `json:"U"`
+		LastUpdate     int64      `json:"u"`
 		Asks           [][]string `json:"a"`
 		Bids           [][]string `json:"b"`
 	} `json:"result"`
@@ -85,18 +85,19 @@ type Gateio struct {
 	orderBookCache map[string]*gateioCacheOrderBook
 }
 
-func (e *Gateio) updateFee() {
-	if data, err := e.RestApi(&RestApiOption{
+func (e *Gateio) updateFee() error {
+	restApiOption := &RestApiOption{
 		method: "GET",
 		path:   "/wallet/fee",
-	}); err != nil {
-		panic(err)
+	}
+
+	if data, err := e.RestApi(restApiOption); err != nil {
+		return err
 	} else {
 		var result gateioFeeResult
 		if err := json.Unmarshal(data, &result); err != nil {
-			panic(err)
+			return err
 		} else {
-
 			makerFee, _ := strconv.ParseFloat(result.MakerFeeRate, 64)
 			takerFee, _ := strconv.ParseFloat(result.TakerFeeRate, 64)
 
@@ -107,18 +108,20 @@ func (e *Gateio) updateFee() {
 
 			for _, currency := range e.currencies {
 				gateioCurrency := e.convertToGateioCurrencyString(currency)
-				err := e.database.SetFee(e.name, gateioCurrency, fee)
-				if err != nil {
-					return
+				if err := e.database.SetFee(e.name, gateioCurrency, fee); err != nil {
+					return err
 				}
 			}
 		}
 	}
+
+	return nil
 }
 
-func (e *Gateio) initializeOrderBook(currency string) {
+func (e *Gateio) initializeOrderBook(currency string) error {
 	gateioCurrency := e.convertToGateioCurrencyString(currency)
-	if data, err := e.RestApi(&RestApiOption{
+
+	restApiOption := &RestApiOption{
 		method: "GET",
 		path:   "/spot/order_book",
 		params: map[string]string{
@@ -126,8 +129,10 @@ func (e *Gateio) initializeOrderBook(currency string) {
 			"limit":         "100",
 			"with_id":       "true",
 		},
-	}); err != nil {
-		panic(err)
+	}
+
+	if data, err := e.RestApi(restApiOption); err != nil {
+		return err
 	} else {
 		e.orderBookCache[currency] = &gateioCacheOrderBook{
 			Id:   0,
@@ -136,17 +141,19 @@ func (e *Gateio) initializeOrderBook(currency string) {
 
 		var result gateioOrderBookRestApiResult
 		if err := json.Unmarshal(data, &result); err != nil {
-			panic(err)
+			return err
 		} else {
 			e.orderBookCache[currency].Id = result.Id
 
 			updateOrderBook(true, e.orderBookCache[currency].Data, result.Asks, result.Bids)
 
 			if err := e.database.SetOrderBook(e.name, currency, e.orderBookCache[currency].Data); err != nil {
-				panic(err)
+				return err
 			}
 		}
 	}
+
+	return nil
 }
 
 func (e *Gateio) updateOrderBook(message []byte) error {
@@ -170,7 +177,10 @@ func (e *Gateio) updateOrderBook(message []byte) error {
 		} else if orderBook.Id+1 > result.Result.LastUpdate {
 			return nil
 		} else if orderBook.Id+1 < result.Result.FirstUpdate {
-			e.initializeOrderBook(currency)
+			err := e.initializeOrderBook(currency)
+			if err != nil {
+				return err
+			}
 		}
 	} else {
 		return errors.New("gateio: order book not found" + currency)
@@ -489,9 +499,11 @@ func (e *Gateio) Start() error {
 		e.running = true
 	}
 
+	e.restClient = &http.Client{}
+
 	go e.waitForDisconnecting()
 
-	okxWebsocketPublicApiURL := url.URL{
+	gateioWebsocketPublicApiURL := url.URL{
 		Scheme: GateioWebsocketApiProtocol,
 		Host:   GateioWebsocketApiHost,
 		Path:   GateioWebsocketApiPath,
@@ -503,16 +515,17 @@ func (e *Gateio) Start() error {
 		MessageHandler: e.handleMessage,
 	})
 
-	if err := e.wsClient.Connect(okxWebsocketPublicApiURL.String()); err != nil {
+	if err := e.wsClient.Connect(gateioWebsocketPublicApiURL.String()); err != nil {
 		return err
 	}
 
 	e.subscribe()
 
-	e.restClient = &http.Client{}
-	e.updateFee()
-	err := e.initializeBalance()
-	if err != nil {
+	if err := e.updateFee(); err != nil {
+		return err
+	}
+
+	if err := e.initializeBalance(); err != nil {
 		return err
 	}
 
