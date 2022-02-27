@@ -3,7 +3,6 @@ package exchange
 import (
 	"Markets/pkg/database"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"os"
 	"testing"
@@ -40,7 +39,7 @@ func TestOkx(t *testing.T) {
 	}
 
 	if err := e.Stop(); err != nil {
-		fmt.Println("Can't stop okx", err)
+		t.Error("Can't stop okx", err)
 	}
 }
 

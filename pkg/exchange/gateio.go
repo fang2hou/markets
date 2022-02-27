@@ -405,7 +405,6 @@ func (e *Gateio) SendMessageJSON(data map[string]interface{}) error {
 	if dataBytes, err := json.Marshal(data); err != nil {
 		return err
 	} else {
-		fmt.Println(string(dataBytes))
 		return e.SendMessageRawBytes(dataBytes)
 	}
 }
