@@ -317,10 +317,6 @@ func (e *Okx) waitForDisconnecting() {
 }
 
 func (e *Okx) handlePublicMessage(message []byte) {
-	if !jsonCheck.MatchString(string(message)) {
-		return
-	}
-
 	var data map[string]interface{}
 	if err := json.Unmarshal(message, &data); err != nil {
 		return
@@ -357,10 +353,6 @@ func (e *Okx) handlePublicMessage(message []byte) {
 }
 
 func (e *Okx) handlePrivateMessage(message []byte) {
-	if !jsonCheck.MatchString(string(message)) {
-		return
-	}
-
 	var data map[string]interface{}
 	if err := json.Unmarshal(message, &data); err != nil {
 		return
