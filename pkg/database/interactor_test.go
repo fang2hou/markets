@@ -125,14 +125,14 @@ func TestInteractor_Order(t *testing.T) {
 
 func TestInteractor_OrderBook(t *testing.T) {
 	testOrderBook := OrderBook{
-		Asks: [][2]float64{
-			{0.0000026400, 1000000},
-			{0.0000026500, 20000},
+		Asks: map[string]string{
+			"0.0000026400": "1000000",
+			"0.0000026500": "20000",
 		},
-		Bids: [][2]float64{
-			{0.0000026200, 1000000},
-			{0.0000026000, 20000},
-			{0.0000025000, 10000},
+		Bids: map[string]string{
+			"0.0000026200": "1000000",
+			"0.0000026000": "20000",
+			"0.0000025000": "10000",
 		},
 	}
 

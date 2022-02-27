@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-func TestConnector_InternalConnector(t *testing.T) {
+func TestConnector_Internal(t *testing.T) {
 	c := NewInternalConnector()
 
 	testString := "testing1234567890"
@@ -25,7 +25,7 @@ func TestConnector_InternalConnector(t *testing.T) {
 	}
 }
 
-func TestConnector_RedisConnector_(t *testing.T) {
+func TestConnector_Redis_(t *testing.T) {
 	c := NewRedisConnector(&redis.Options{
 		Addr:     "localhost:6379",
 		Password: "", // no password set
