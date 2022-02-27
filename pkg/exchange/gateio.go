@@ -116,17 +116,12 @@ func (e *Gateio) updateFee() error {
 		if err := json.Unmarshal(data, &result); err != nil {
 			return err
 		} else {
-			makerFee, _ := strconv.ParseFloat(result.MakerFeeRate, 64)
-			takerFee, _ := strconv.ParseFloat(result.TakerFeeRate, 64)
-
-			fee := &database.Fee{
-				Maker: makerFee,
-				Taker: takerFee,
-			}
+			fee := &database.Fee{}
+			fee.Maker, _ = strconv.ParseFloat(result.MakerFeeRate, 64)
+			fee.Taker, _ = strconv.ParseFloat(result.TakerFeeRate, 64)
 
 			for _, currency := range e.currencies {
-				gateioCurrency := e.convertToGateioCurrencyString(currency)
-				if err := e.database.SetFee(e.name, gateioCurrency, fee); err != nil {
+				if err := e.database.SetFee(e.name, currency, fee); err != nil {
 					return err
 				}
 			}

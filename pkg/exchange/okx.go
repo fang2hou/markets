@@ -530,8 +530,7 @@ func (e *Okx) RestApi(option *RestApiOption) ([]byte, error) {
 
 		if resp, err := e.restClient.Do(req); err == nil {
 			defer func(Body io.ReadCloser) {
-				err := Body.Close()
-				if err != nil {
+				if err := Body.Close(); err != nil {
 					panic(err)
 				}
 			}(resp.Body)
