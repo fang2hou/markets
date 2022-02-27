@@ -4,7 +4,6 @@ import (
 	"Markets/pkg/database"
 	"encoding/json"
 	"fmt"
-	"github.com/go-redis/redis/v8"
 	"net/http"
 	"os"
 	"testing"
@@ -38,30 +37,6 @@ func TestOkx(t *testing.T) {
 
 	if err := e.Start(); err != nil {
 		t.Error("Can't start okx:", err)
-	}
-
-	if err := e.Stop(); err != nil {
-		fmt.Println("Can't stop okx", err)
-	}
-}
-
-func TestOkx_Redis_(t *testing.T) {
-	e := NewOkx(
-		map[string]string{
-			"apiKey":   os.Getenv("TEST_OKX_API_KEY"),
-			"secret":   os.Getenv("TEST_OKX_SECRET"),
-			"password": os.Getenv("TEST_OKX_PASSPHASE"),
-		},
-		[]string{"STARL/USDT"},
-		database.NewInteractor(database.NewRedisConnector(&redis.Options{
-			Addr:     "localhost:6379",
-			Password: "",
-			DB:       0,
-		})),
-	)
-
-	if err := e.Start(); err != nil {
-		fmt.Println("Can't start okx:", err)
 	}
 
 	if err := e.Stop(); err != nil {
