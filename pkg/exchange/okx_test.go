@@ -101,7 +101,7 @@ func TestOkx_Redis_(t *testing.T) {
 		fmt.Println("Can't start okx:", err)
 	}
 
-	<-time.After(time.Second * 5)
+	<-time.After(time.Second * 15)
 
 	if err := e.Stop(); err != nil {
 		fmt.Println("Can't stop okx", err)

@@ -107,7 +107,7 @@ type Okx struct {
 		Passphrase string
 	}
 
-	orderBookCache database.OrderBook
+	orderBookCache map[string]*database.OrderBook
 }
 
 func (e *Okx) updateFee() {
@@ -116,7 +116,7 @@ func (e *Okx) updateFee() {
 	}
 
 	for _, currency := range e.currencies {
-		okxCurrency := e.convertToGeneralCurrencyString(currency)
+		okxCurrency := e.convertToOkxCurrencyString(currency)
 		if data, err := e.RestApi(&RestApiOption{
 			method: "GET",
 			path:   "/account/trade-fee",
@@ -168,39 +168,39 @@ func (e *Okx) updateOrderBook(message []byte) error {
 
 	switch result.Action {
 	case "snapshot":
-		e.orderBookCache.Asks = make(map[string]string)
-		e.orderBookCache.Bids = make(map[string]string)
+		e.orderBookCache[currency].Asks = make(map[string]string)
+		e.orderBookCache[currency].Bids = make(map[string]string)
 
 		for _, data := range result.Data {
 			for _, ask := range data.Asks {
-				e.orderBookCache.Asks[ask[0]] = ask[1]
+				e.orderBookCache[currency].Asks[ask[0]] = ask[1]
 			}
 
 			for _, bid := range data.Bids {
-				e.orderBookCache.Bids[bid[0]] = bid[1]
+				e.orderBookCache[currency].Bids[bid[0]] = bid[1]
 			}
 		}
 	case "update":
 		for _, data := range result.Data {
 			for _, ask := range data.Asks {
 				if ask[1] == "0" {
-					delete(e.orderBookCache.Asks, ask[0])
+					delete(e.orderBookCache[currency].Asks, ask[0])
 				} else {
-					e.orderBookCache.Asks[ask[0]] = ask[1]
+					e.orderBookCache[currency].Asks[ask[0]] = ask[1]
 				}
 			}
 
 			for _, bid := range data.Bids {
 				if bid[1] == "0" {
-					delete(e.orderBookCache.Bids, bid[0])
+					delete(e.orderBookCache[currency].Bids, bid[0])
 				} else {
-					e.orderBookCache.Bids[bid[0]] = bid[1]
+					e.orderBookCache[currency].Bids[bid[0]] = bid[1]
 				}
 			}
 		}
 	}
 
-	if err := e.database.SetOrderBook(e.name, currency, &e.orderBookCache); err != nil {
+	if err := e.database.SetOrderBook(e.name, currency, e.orderBookCache[currency]); err != nil {
 		return err
 	}
 
@@ -439,7 +439,7 @@ func (e *Okx) subscribe() {
 	})
 
 	for _, currency := range e.currencies {
-		okxCurrency := e.convertToGeneralCurrencyString(currency)
+		okxCurrency := e.convertToOkxCurrencyString(currency)
 		args = append(args, map[string]interface{}{
 			"channel":  "orders",
 			"instType": "SPOT",
@@ -682,6 +682,11 @@ func NewOkx(config map[string]string, currencies []string, interactor *database.
 		okx.authData.Passphrase = passphrase
 	} else {
 		panic("No API Passphrase provided for OKX")
+	}
+
+	okx.orderBookCache = make(map[string]*database.OrderBook)
+	for _, currency := range currencies {
+		okx.orderBookCache[currency] = &database.OrderBook{}
 	}
 
 	return okx
