@@ -65,10 +65,11 @@ func (clt *Client) sendMessage() {
 				return
 			}
 			clt.sendMux.Lock()
-			if err := clt.ws.WriteMessage(websocket.TextMessage, message); err != nil {
+			err := clt.ws.WriteMessage(websocket.TextMessage, message)
+			clt.sendMux.Unlock()
+			if err != nil {
 				return
 			}
-			clt.sendMux.Unlock()
 		}
 	}
 }
@@ -127,8 +128,8 @@ func (clt *Client) Close() error {
 		return nil
 	}
 
-	clt.sendMux.Lock()
 	data := websocket.FormatCloseMessage(websocket.CloseNormalClosure, "")
+	clt.sendMux.Lock()
 	_ = clt.ws.WriteMessage(websocket.CloseMessage, data)
 	clt.sendMux.Unlock()
 
