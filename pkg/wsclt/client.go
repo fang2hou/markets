@@ -3,7 +3,6 @@ package wsclt
 import (
 	"crypto/tls"
 	"errors"
-	"fmt"
 	"github.com/gorilla/websocket"
 	"sync"
 	"time"
@@ -36,7 +35,6 @@ func (clt *Client) readMessage() {
 		_, message, err := clt.ws.ReadMessage()
 		if err != nil {
 			close(clt.messageWaitForSending)
-			fmt.Println("readMessage error:", err)
 			return
 		}
 

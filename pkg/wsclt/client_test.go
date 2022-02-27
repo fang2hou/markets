@@ -30,7 +30,7 @@ func TestClient(t *testing.T) {
 
 	err = clt.Connect("wss://ws.okx.com:8443/ws/v5/public")
 	if err.Error() != "already connected" {
-		t.Errorf("Connect error: %v", err)
+		t.Errorf("Connection state check error: %v", err)
 	}
 
 	parameters := map[string]interface{}{
@@ -43,13 +43,12 @@ func TestClient(t *testing.T) {
 		},
 	}
 
-	dataBytes, err := json.Marshal(parameters)
-	if err != nil {
+	if dataBytes, err := json.Marshal(parameters); err != nil {
 		t.Errorf("Marshal error: %v", err)
-	}
-
-	if err := clt.SendMessage(dataBytes); err != nil {
-		t.Errorf("SendMessage error: %v", err)
+	} else {
+		if err := clt.SendMessage(dataBytes); err != nil {
+			t.Errorf("SendMessage error: %v", err)
+		}
 	}
 
 	for {
@@ -61,6 +60,7 @@ func TestClient(t *testing.T) {
 
 	var decodedMsg map[string]interface{}
 	err = json.Unmarshal(result, &decodedMsg)
+
 	if err != nil {
 		t.Errorf("Unmarshal error: %v", err)
 	}
@@ -73,8 +73,8 @@ func TestClient(t *testing.T) {
 		},
 	}
 
-	if reflect.DeepEqual(decodedMsg, expectedMsg) == false {
-		t.Errorf("Unexpected message: %v", decodedMsg)
+	if !reflect.DeepEqual(expectedMsg, decodedMsg) {
+		t.Errorf("Expected message is\n\t%v, however the message is\n\t%v", expectedMsg, decodedMsg)
 	}
 
 	if err := clt.Close(); err != nil {
