@@ -1,11 +1,13 @@
 package main
 
 import (
+	"os"
+
+	"github.com/go-redis/redis/v8"
+
 	"Markets/internal/pkg/config"
 	"Markets/pkg/database"
 	"Markets/pkg/exchange"
-	"github.com/go-redis/redis/v8"
-	"io/ioutil"
 )
 
 func pollExchange(e exchange.Exchanger) {
@@ -25,7 +27,7 @@ func pollExchange(e exchange.Exchanger) {
 }
 
 func main() {
-	dataBytes, err := ioutil.ReadFile("configs/config.yaml")
+	dataBytes, err := os.ReadFile("configs/config.yaml")
 	if err != nil {
 		panic(err)
 	}
