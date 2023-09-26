@@ -1,4 +1,4 @@
-# Markets
+# markets
 
 ## Introduction
 
@@ -11,6 +11,7 @@ LICENSE: LGPL version 3
 ```
 
 ## Features
+
 1. Support WebSocket API of various exchanges with very high performance.
 2. Support for using both Rest API and WebSocket API in a single thread.
 3. Multiple exchanges can be polled at the same time.
@@ -33,11 +34,13 @@ Here is the sample code, just set your API token in the `config.yaml` file, and 
 package main
 
 import (
-	"Markets/internal/pkg/config"
-	"Markets/pkg/database"
-	"Markets/pkg/exchange"
+	"os"
+
 	"github.com/go-redis/redis/v8"
-	"io/ioutil"
+
+	"markets/internal/pkg/config"
+	"markets/pkg/database"
+	"markets/pkg/exchange"
 )
 
 func pollExchange(e exchange.Exchanger) {
@@ -57,7 +60,7 @@ func pollExchange(e exchange.Exchanger) {
 }
 
 func main() {
-	dataBytes, err := ioutil.ReadFile("configs/config.yaml")
+	dataBytes, err := os.ReadFile("configs/config.yaml")
 	if err != nil {
 		panic(err)
 	}
