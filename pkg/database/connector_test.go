@@ -1,8 +1,9 @@
 package database
 
 import (
-	"github.com/go-redis/redis/v8"
 	"testing"
+
+	redis "github.com/go-redis/redis/v8"
 )
 
 func TestConnector_Internal(t *testing.T) {

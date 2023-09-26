@@ -3,9 +3,10 @@ package wsclt
 import (
 	"crypto/tls"
 	"errors"
-	"github.com/gorilla/websocket"
 	"sync"
 	"time"
+
+	"github.com/gorilla/websocket"
 )
 
 type Options struct {

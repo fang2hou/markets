@@ -1,10 +1,11 @@
 package exchange
 
 import (
-	"Markets/pkg/database"
 	"encoding/json"
 	"os"
 	"testing"
+
+	"Markets/pkg/database"
 )
 
 func TestGateio(t *testing.T) {

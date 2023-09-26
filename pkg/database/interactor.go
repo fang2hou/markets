@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-//Interactor is the interface for interacting with the database
+// Interactor is the interface for interacting with the database
 type Interactor struct {
 	connector Connector
 }
@@ -17,7 +17,6 @@ func (_ *Interactor) GenerateKeyWithPath(path []string) string {
 
 func (i *Interactor) GetString(region string, key string) (*string, error) {
 	dataStringPointer, err := i.connector.Get(region, key)
-
 	if err != nil {
 		return nil, err
 	}
@@ -31,7 +30,6 @@ func (i *Interactor) SetString(region string, key string, value *string) error {
 
 func (i *Interactor) GetMap(region string, key string) (*map[string]interface{}, error) {
 	dataStringPointer, err := i.connector.Get(region, key)
-
 	if err != nil {
 		return nil, err
 	}
@@ -62,7 +60,6 @@ func (i *Interactor) GetBalance(exchangeName string, currency string) (*Balance,
 	key := i.GenerateKeyWithPath([]string{exchangeName, currency})
 
 	dataString, err := i.connector.Get("Balance", key)
-
 	if err != nil {
 		return nil, err
 	}
@@ -90,7 +87,6 @@ func (i *Interactor) GetFee(exchangeName string, currency string) (*Fee, error) 
 	key := i.GenerateKeyWithPath([]string{exchangeName, currency})
 
 	dataStringPointer, err := i.connector.Get("Fee", key)
-
 	if err != nil {
 		return nil, err
 	}
@@ -122,7 +118,6 @@ func (i *Interactor) GetOrder(exchangeName string, currency string, orderId stri
 	key := i.GenerateKeyWithPath([]string{exchangeName, currency, orderId})
 
 	dataStringPointer, err := i.connector.Get("Order", key)
-
 	if err != nil {
 		return nil, err
 	}
@@ -150,7 +145,6 @@ func (i *Interactor) GetOrderBook(exchangeName string, currency string) (*OrderB
 	key := i.GenerateKeyWithPath([]string{exchangeName, currency})
 
 	dataStringPointer, err := i.connector.Get("OrderBook", key)
-
 	if err != nil {
 		return nil, err
 	}

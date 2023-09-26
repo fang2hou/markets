@@ -31,7 +31,7 @@ log:
 
 	if currencies, err := testConfig.GetCurrenciesSetting(); err != nil {
 		t.Errorf("Config GetCurrencies Error: '%s'", err)
-	}else if reflect.DeepEqual(currencies, []string{"STARL/USDT", "BTC/USDT"}) == false {
+	} else if reflect.DeepEqual(currencies, []string{"STARL/USDT", "BTC/USDT"}) == false {
 		t.Errorf("Config GetCurrencies Error: Expected '%v' Got '%v':", []string{"STARL/USDT", "BTC/USDT"}, currencies)
 	}
 

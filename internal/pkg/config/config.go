@@ -2,16 +2,16 @@ package config
 
 import (
 	"errors"
-	"gopkg.in/yaml.v3"
+
+	yaml "gopkg.in/yaml.v3"
 )
 
-
 type configData struct {
-	Exchanges map[string]map[string]string `yaml:"exchange"`
-	Currencies []string `yaml:"currency"`
-	Log struct {
-		Enabled bool `yaml:"enable"`
-		Path 	string `yaml:"path"`
+	Exchanges  map[string]map[string]string `yaml:"exchange"`
+	Currencies []string                     `yaml:"currency"`
+	Log        struct {
+		Enabled bool   `yaml:"enable"`
+		Path    string `yaml:"path"`
 	} `yaml:"log"`
 }
 

@@ -1,8 +1,9 @@
 package exchange
 
 import (
-	"Markets/pkg/database"
 	"time"
+
+	"Markets/pkg/database"
 )
 
 type Exchanger interface {

@@ -1,9 +1,10 @@
 package exchange
 
 import (
-	"Markets/pkg/database"
 	"reflect"
 	"testing"
+
+	"Markets/pkg/database"
 )
 
 func TestUpdateOrderBook(t *testing.T) {
@@ -43,10 +44,9 @@ func TestUpdateOrderBook(t *testing.T) {
 			"0.0000025000": "10000",
 			"0.0000034567": "78978",
 		},
-	}){
+	}) {
 		t.Error("OrderBook not incremental updated correctly")
 	}
-
 
 	asksData = [][]string{
 		{"0.0000012345", "19929"},
@@ -69,7 +69,7 @@ func TestUpdateOrderBook(t *testing.T) {
 			"0.0000026000": "12345",
 			"0.0000034567": "78978",
 		},
-	}){
+	}) {
 		t.Error("OrderBook not fully updated correctly")
 	}
 }

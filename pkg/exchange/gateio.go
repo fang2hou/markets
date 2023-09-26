@@ -1,8 +1,6 @@
 package exchange
 
 import (
-	"Markets/pkg/database"
-	"Markets/pkg/wsclt"
 	"crypto/hmac"
 	"crypto/sha512"
 	"encoding/hex"
@@ -17,6 +15,9 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"Markets/pkg/database"
+	"Markets/pkg/wsclt"
 )
 
 const (

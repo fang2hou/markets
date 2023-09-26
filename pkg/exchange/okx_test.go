@@ -1,11 +1,12 @@
 package exchange
 
 import (
-	"Markets/pkg/database"
 	"encoding/json"
 	"net/http"
 	"os"
 	"testing"
+
+	"Markets/pkg/database"
 )
 
 func TestOkx(t *testing.T) {

@@ -3,7 +3,8 @@ package database
 import (
 	"context"
 	"errors"
-	"github.com/go-redis/redis/v8"
+
+	redis "github.com/go-redis/redis/v8"
 )
 
 // Connector is the interface that wraps the database accessing method.
