@@ -4,7 +4,7 @@ import (
 	"reflect"
 	"testing"
 
-	"Markets/pkg/database"
+	"markets/pkg/database"
 )
 
 func TestUpdateOrderBook(t *testing.T) {

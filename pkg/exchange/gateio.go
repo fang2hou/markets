@@ -16,8 +16,8 @@ import (
 	"strings"
 	"time"
 
-	"Markets/pkg/database"
-	"Markets/pkg/wsclt"
+	"markets/pkg/database"
+	"markets/pkg/wsclt"
 )
 
 const (

@@ -6,7 +6,7 @@ import (
 	"os"
 	"testing"
 
-	"Markets/pkg/database"
+	"markets/pkg/database"
 )
 
 func TestOkx(t *testing.T) {

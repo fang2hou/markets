@@ -3,7 +3,7 @@ package exchange
 import (
 	"time"
 
-	"Markets/pkg/database"
+	"markets/pkg/database"
 )
 
 type Exchanger interface {

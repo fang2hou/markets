@@ -5,9 +5,9 @@ import (
 
 	"github.com/go-redis/redis/v8"
 
-	"Markets/internal/pkg/config"
-	"Markets/pkg/database"
-	"Markets/pkg/exchange"
+	"markets/internal/pkg/config"
+	"markets/pkg/database"
+	"markets/pkg/exchange"
 )
 
 func pollExchange(e exchange.Exchanger) {

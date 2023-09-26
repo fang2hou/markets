@@ -1,4 +1,4 @@
-module Markets
+module markets
 
 go 1.21
 

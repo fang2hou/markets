@@ -1,6 +1,6 @@
 package exchange
 
-import "Markets/pkg/database"
+import "markets/pkg/database"
 
 func updateOrderBook(
 	fullMode bool,
